@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
+import DatePicker from '../UI/DatePicker';
 
 const statusLabels = {
   'planned': 'План',
@@ -148,7 +149,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
           </div>
           <div style={{flex: 1}}>
             <div className="detail-label">Срок</div>
-            <input type="date" className="edit-select" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+            <DatePicker value={editDate} onChange={(val) => setEditDate(val)} />
           </div>
         </div>
 
