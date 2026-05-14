@@ -621,7 +621,7 @@ function App() {
         </main>
 
         {(selectedTask && activeView === 'map') && (
-           <div style={{ position: 'absolute', left: panelPos.x, top: panelPos.y, zIndex: 100, display: 'flex' }} onMouseDown={handlePanelDragStart}>
+           <div style={{ position: 'absolute', left: panelPos.x, top: panelPos.y, zIndex: 100, display: 'flex' }}>
               <TaskSidebar 
                 taskId={selectedTask.id} 
                 onClose={() => setSelectedTaskId(null)} 
@@ -629,6 +629,7 @@ function App() {
                 users={users} 
                 stages={stages} 
                 onTaskUpdated={(updatedTask) => setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t))} 
+                onDragStart={handlePanelDragStart}
               />
            </div>
         )}

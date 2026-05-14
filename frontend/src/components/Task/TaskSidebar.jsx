@@ -9,7 +9,7 @@ const statusLabels = {
   'overdue': 'Просрочено'
 };
 
-export default function TaskSidebar({ taskId, onClose, currentUser, users, stages, onTaskUpdated }) {
+export default function TaskSidebar({ taskId, onClose, currentUser, users, stages, onTaskUpdated, onDragStart }) {
   const [task, setTask] = useState(null);
   const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
@@ -112,7 +112,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
 
   return (
     <aside className="glass-panel sidebar-right" style={{ display: 'flex' }} onClick={(e) => e.stopPropagation()}>
-      <div className="panel-header">
+      <div className="panel-header" onMouseDown={onDragStart} style={{cursor: 'move'}}>
         <h2>Свойства задачи</h2>
         <button className="btn btn-icon" onClick={onClose}>✕</button>
       </div>
