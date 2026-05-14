@@ -54,6 +54,17 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
 
   const handleUpdateTask = async () => {
     if (!task) return;
+    
+    // Сохраняем не отправленный комментарий, если он есть
+    if (commentText.trim()) {
+      await handleAddComment();
+    }
+    
+    // Сохраняем не добавленную подзадачу, если она есть
+    if (newSubtaskTitle.trim()) {
+      await handleAddSubtask();
+    }
+
     const updates = { 
       name: editName, 
       status: editStatus, 
@@ -156,10 +167,6 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
           <textarea className="edit-textarea" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Добавьте описание задачи..." />
         </div>
 
-        <div className="detail-section">
-          <button className="btn btn-primary" style={{width: '100%'}} onClick={handleUpdateTask}>Сохранить основные изменения</button>
-        </div>
-
         {/* НОВЫЙ БЛОК: Подзадачи */}
         <div className="detail-section" style={{marginTop: '2rem'}}>
           <div className="detail-label" style={{borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.5rem', marginBottom: '1rem'}}>
@@ -167,7 +174,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
           </div>
           <div style={{display: 'flex', gap: '0.5rem', marginBottom: '1rem'}}>
             <input type="text" className="auth-input" style={{marginBottom: 0, flex: 1}} value={newSubtaskTitle} onChange={e => setNewSubtaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddSubtask()} placeholder="Название подзадачи..." />
-            <button className="btn btn-primary" onClick={handleAddSubtask}>+</button>
+            <button className="btn" style={{background: 'rgba(255,255,255,0.1)', color: 'white'}} onClick={handleAddSubtask}>Добавить</button>
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             {subtasks.map((st) => (
@@ -197,8 +204,11 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             <textarea className="edit-textarea" value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Написать комментарий..." style={{minHeight: '60px'}} />
-            <button className="btn btn-primary" onClick={handleAddComment} style={{alignSelf: 'flex-end'}}>Отправить</button>
           </div>
+        </div>
+
+        <div className="detail-section" style={{marginTop: '2rem'}}>
+          <button className="btn btn-primary" style={{width: '100%', padding: '1rem', fontSize: '1rem'}} onClick={handleUpdateTask}>Сохранить все изменения и закрыть</button>
         </div>
 
       </div>

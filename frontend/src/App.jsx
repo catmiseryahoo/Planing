@@ -239,6 +239,15 @@ function App() {
     }
   };
 
+  const handleDeleteProject = async (id) => {
+    if (!window.confirm("Удалить проект и все его задачи?")) return;
+    const { error } = await supabase.from('projects').delete().eq('id', id);
+    if (!error) {
+      setProjects(projects.filter(p => p.id !== id));
+      if (activeProjectId === id) setActiveProjectId(null);
+    }
+  };
+
   const handleCreateTask = async (stageId) => {
     const newTask = { stage_id: stageId, name: 'Новая задача', status: 'planned', assignee_id: currentUser.id, checklist: [], attachments: [], feed: [], is_modified: false };
     const { data, error } = await supabase.from('tasks').insert([newTask]).select();
@@ -250,14 +259,22 @@ function App() {
 
   const handleAddStage = async () => {
     if (!activeProjectId) return;
+    const name = prompt("Введите название этапа:");
+    if (!name) return;
     const newOrder = projectStages.length > 0 ? projectStages[projectStages.length - 1].order + 1 : 1;
-    const { data, error } = await supabase.from('stages').insert([{ project_id: activeProjectId, name: 'Новый этап', order: newOrder }]).select();
+    const newStage = { project_id: activeProjectId, name, order: newOrder };
+    const { data, error } = await supabase.from('stages').insert([newStage]).select();
     if (!error && data) setStages([...stages, data[0]]);
   };
 
   const handleRenameStage = async (id, newName) => {
     setStages(stages.map(s => s.id === id ? { ...s, name: newName } : s));
     await supabase.from('stages').update({ name: newName }).eq('id', id);
+  };
+
+  const handleStageColorChange = async (id, newColor) => {
+    setStages(stages.map(s => s.id === id ? { ...s, color: newColor } : s));
+    await supabase.from('stages').update({ color: newColor }).eq('id', id);
   };
 
   const handleDragStartStage = (e, stageId) => {
@@ -394,7 +411,12 @@ function App() {
                   const overdueCount = projectTasks.filter(t => t.status === 'overdue').length;
                   return (
                     <div key={project.id} className={`project-item ${activeProjectId === project.id ? 'active' : ''}`} onClick={() => { setActiveProjectId(project.id); setSelectedTaskId(null); }}>
-                      <div className="project-name">{project.name}</div>
+                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <div className="project-name">{project.name}</div>
+                        {currentUser?.role === 'Администратор' && (
+                           <button className="btn btn-icon" style={{padding: '2px', color: 'var(--status-overdue-text)'}} onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }}>✕</button>
+                        )}
+                      </div>
                       <div className="project-meta">
                         <span>{projectTasks.length} задач</span>
                         {overdueCount > 0 && <span style={{color: 'var(--status-overdue-text)'}}>{overdueCount} просрочено</span>}
@@ -575,8 +597,9 @@ function App() {
                       const stageTasks = tasks.filter(t => t.stage_id === stage.id);
                       return (
                         <div key={stage.id} className={`stage-column ${draggedStageId === stage.id ? 'dragging' : ''}`} onDragOver={handleDragOverStage} onDrop={(e) => handleDropStage(e, stage.id)}>
-                          <div className="stage-header" draggable="true" onDragStart={(e) => handleDragStartStage(e, stage.id)}>
-                            <div className="stage-title">
+                          <div className="stage-header" draggable="true" onDragStart={(e) => handleDragStartStage(e, stage.id)} style={{ borderTop: `4px solid ${stage.color || '#3b82f6'}` }}>
+                            <div className="stage-title" style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                              <input type="color" value={stage.color || '#3b82f6'} onChange={(e) => handleStageColorChange(stage.id, e.target.value)} style={{width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer'}} title="Выбрать цвет этапа" />
                               <input type="text" value={stage.name} onChange={(e) => handleRenameStage(stage.id, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', outline: 'none' }} />
                             </div>
                             <div className="stage-stats">{stageTasks.length} задач</div>
