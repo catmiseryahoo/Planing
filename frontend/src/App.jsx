@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, supabaseAdmin } from './supabaseClient';
+import AuthScreen from './components/Auth/AuthScreen';
+import ProfilePanel from './components/Profile/ProfilePanel';
+import TaskSidebar from './components/Task/TaskSidebar';
+import GanttChart from './components/Map/GanttChart';
 import './index.css';
 
 const statusLabels = {
@@ -20,9 +24,6 @@ const formatDate = (dateString) => {
 function App() {
   const [session, setSession] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
 
   const [projects, setProjects] = useState([]);
   const [stages, setStages] = useState([]);
@@ -33,6 +34,7 @@ function App() {
 
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [activeView, setActiveView] = useState('map'); // map, profile, admin
+  const [activeProjectView, setActiveProjectView] = useState('kanban'); // kanban, gantt
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [draggedStageId, setDraggedStageId] = useState(null);
 
@@ -49,12 +51,6 @@ function App() {
   const [editAttachments, setEditAttachments] = useState([]);
   const [newChecklistItemText, setNewChecklistItemText] = useState('');
   const [commentText, setCommentText] = useState('');
-  
-  // Profile edit states
-  const [profileName, setProfileName] = useState('');
-  const [profilePhone, setProfilePhone] = useState('');
-  const [profileTelegram, setProfileTelegram] = useState('');
-  const [profileAvatarColor, setProfileAvatarColor] = useState('');
 
   // Admin Create User states
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -63,7 +59,6 @@ function App() {
   const [newUserRole, setNewUserRole] = useState('Сотрудник');
 
   const [adminEditingUser, setAdminEditingUser] = useState(null);
-  const [profileAvatarUrl, setProfileAvatarUrl] = useState('');
 
   const [isDragOverDropZone, setIsDragOverDropZone] = useState(false);
   const fileInputRef = useRef(null);
@@ -107,11 +102,6 @@ function App() {
       const me = profilesRes.data?.find(u => u.id === session.user.id);
       if (me) {
         setCurrentUser(me);
-        setProfileName(me.name || '');
-        setProfilePhone(me.phone || '');
-        setProfileTelegram(me.telegram || '');
-        setProfileAvatarColor(me.avatar_color || '#3b82f6');
-        setProfileAvatarUrl(me.avatar_url || '');
       }
     } catch (error) {
       console.error(error);
@@ -119,6 +109,7 @@ function App() {
       setIsDataLoading(false);
     }
   };
+
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -138,53 +129,8 @@ function App() {
     };
   }, [isDraggingPanel, panelDragOffset]);
 
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    setAuthError('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setAuthError(error.message);
-  };
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
-  };
-
-  const handleUpdateProfile = async () => {
-    if (!currentUser) return;
-    
-    // Проверка правильности телефона (если введен)
-    const phoneDigits = profilePhone.replace(/\D/g, '');
-    if (phoneDigits && phoneDigits.length < 11) {
-      alert("Пожалуйста, введите полный номер телефона (11 цифр).");
-      return;
-    }
-
-    const updates = { name: profileName, phone: profilePhone, telegram: profileTelegram, avatar_color: profileAvatarColor, avatar_url: profileAvatarUrl };
-    const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
-    if (!error) {
-      setCurrentUser({ ...currentUser, ...updates });
-      setUsers(users.map(u => u.id === currentUser.id ? { ...u, ...updates } : u));
-      alert("Профиль обновлен!");
-    } else {
-      alert("Ошибка обновления профиля: " + error.message);
-    }
-  };
-
-  const handlePhoneChange = (e) => {
-    let val = e.target.value.replace(/\D/g, '');
-    if (!val) { setProfilePhone(''); return; }
-    
-    // Форсируем начало с 7
-    if (val.length > 0 && val[0] === '8') val = '7' + val.substring(1);
-    else if (val.length > 0 && val[0] !== '7') val = '7' + val;
-
-    let res = '+7';
-    if (val.length > 1) res += ' (' + val.substring(1, 4);
-    if (val.length >= 5) res += ') ' + val.substring(4, 7);
-    if (val.length >= 8) res += '-' + val.substring(7, 9);
-    if (val.length >= 10) res += '-' + val.substring(9, 11);
-    
-    setProfilePhone(res);
   };
 
   const handleCreateUser = async (e) => {
@@ -230,24 +176,7 @@ function App() {
   if (isLoadingAuth) return <div style={{padding:'2rem', color:'var(--text-primary)'}}>Загрузка авторизации...</div>;
 
   if (!session) {
-    return (
-      <div className="auth-container">
-        <div className="auth-card">
-          <div className="auth-title">Вход в Orbite</div>
-          <div style={{color:'var(--text-secondary)', fontSize:'0.85rem', textAlign:'center', marginBottom:'1.5rem'}}>
-            Регистрация закрыта. Обратитесь к Администратору для получения аккаунта.
-          </div>
-          {authError && <div className="auth-error">{authError}</div>}
-          <form onSubmit={handleAuth} style={{display:'flex', flexDirection:'column'}}>
-            <input className="auth-input" type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} required />
-            <input className="auth-input" type="password" placeholder="Пароль" value={password} onChange={e=>setPassword(e.target.value)} required />
-            <button className="btn btn-primary" type="submit" style={{width:'100%', padding:'0.75rem', fontSize:'1rem'}}>
-              Войти
-            </button>
-          </form>
-        </div>
-      </div>
-    );
+    return <AuthScreen />;
   }
 
   if (isDataLoading || !currentUser) {
@@ -482,71 +411,12 @@ function App() {
           
           {/* PROFILE VIEW */}
           {activeView === 'profile' && (
-            <>
-              <div className="panel-header"><h2>Личный кабинет</h2></div>
-              <div className="panel-content" style={{maxWidth: '500px'}}>
-                <div className="detail-section">
-                  <div className="detail-label">Ваш Email</div>
-                  <input className="edit-select" value={currentUser.email} disabled style={{opacity: 0.5}} />
-                </div>
-                <div className="detail-section">
-                  <div className="detail-label">ФИО</div>
-                  <input className="edit-select" value={profileName} onChange={e=>setProfileName(e.target.value)} placeholder="Иван Иванов" />
-                </div>
-                <div className="detail-section">
-                  <div className="detail-label">Телефон</div>
-                  <input 
-                    className="edit-select" 
-                    value={profilePhone} 
-                    onChange={handlePhoneChange} 
-                    placeholder="+7 (999) 000-00-00" 
-                    maxLength={18}
-                  />
-                </div>
-                <div className="detail-section">
-                  <div className="detail-label">Telegram</div>
-                  <div style={{display:'flex', alignItems:'center', background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-md)', padding: '0 0.75rem', border: '1px solid var(--panel-border)'}}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="#2AABEE"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.18-.08-.05-.19-.02-.27 0-.11.03-1.87 1.18-5.28 3.45-.5.35-.95.53-1.35.52-.45-.01-1.31-.25-1.95-.45-.79-.26-1.42-.4-1.36-.84.03-.22.34-.44.93-.68 3.65-1.59 6.09-2.62 7.32-3.13 3.48-1.45 4.2-1.7 4.67-1.71.1 0 .34.02.46.12.1.09.13.21.14.33.02.16.01.35-.01.46z"/></svg>
-                    <span style={{color:'var(--text-secondary)', marginLeft: '0.5rem'}}>@</span>
-                    <input 
-                      className="edit-select" 
-                      style={{border:'none', background:'transparent', flex:1, marginBottom:0, paddingLeft: '0.2rem', outline: 'none'}} 
-                      value={profileTelegram} 
-                      onChange={e => setProfileTelegram(e.target.value.replace('@', ''))} 
-                      placeholder="username" 
-                    />
-                  </div>
-                </div>
-                <div className="detail-section">
-                  <div className="detail-label">Цвет профиля или фото (аватар)</div>
-                  <div style={{display:'flex', gap:'1rem', alignItems:'center', marginTop:'0.5rem'}}>
-                    {profileAvatarUrl ? (
-                      <img src={profileAvatarUrl} alt="avatar" style={{width:'48px', height:'48px', borderRadius:'50%', objectFit:'cover', border:'2px solid var(--panel-border)'}} />
-                    ) : (
-                      <div style={{width:'48px', height:'48px', borderRadius:'50%', backgroundColor: profileAvatarColor || '#ccc', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', fontWeight:'bold', color:'white'}}>
-                        {getUserInitials(currentUser.name || currentUser.email)}
-                      </div>
-                    )}
-                    <div style={{flex: 1}}>
-                      <input type="file" accept="image/*" onChange={(e) => {
-                         if (e.target.files && e.target.files[0]) {
-                            const reader = new FileReader();
-                            reader.onload = (ev) => { setProfileAvatarUrl(ev.target.result); };
-                            reader.readAsDataURL(e.target.files[0]);
-                         }
-                      }} style={{fontSize:'0.8rem'}} />
-                      <div style={{fontSize:'0.75rem', color:'var(--text-secondary)', marginTop:'0.25rem'}}>Или цвет (если нет фото):</div>
-                      <div style={{display:'flex', gap:'0.25rem', marginTop:'0.25rem'}}>
-                        {['#3b82f6', '#ec4899', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444'].map(color => (
-                          <div key={color} style={{width:'24px', height:'24px', borderRadius:'50%', backgroundColor: color, cursor:'pointer', border: profileAvatarColor === color ? '2px solid white' : '2px solid transparent'}} onClick={() => { setProfileAvatarColor(color); setProfileAvatarUrl(''); }} />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <button className="btn btn-primary" onClick={handleUpdateProfile}>Сохранить изменения</button>
-              </div>
-            </>
+            <ProfilePanel 
+              currentUser={currentUser} 
+              users={users} 
+              setUsers={setUsers} 
+              setCurrentUser={setCurrentUser} 
+            />
           )}
 
           {/* ADMIN VIEW */}
@@ -694,154 +564,74 @@ function App() {
               <div className="panel-header">
                 <h2>{activeProject?.name || 'Выберите проект'}</h2>
                 <div className="view-tabs">
-                  <button className="view-tab active">Карта</button>
+                  <button className={`view-tab ${activeProjectView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveProjectView('kanban')}>Канбан (Карта)</button>
+                  <button className={`view-tab ${activeProjectView === 'gantt' ? 'active' : ''}`} onClick={() => setActiveProjectView('gantt')}>Диаграмма Ганта</button>
                 </div>
               </div>
-              <div className="panel-content">
-                <div className="map-container">
-                  {projectStages.map(stage => {
-                    const stageTasks = tasks.filter(t => t.stage_id === stage.id);
-                    return (
-                      <div key={stage.id} className={`stage-column ${draggedStageId === stage.id ? 'dragging' : ''}`} onDragOver={handleDragOverStage} onDrop={(e) => handleDropStage(e, stage.id)}>
-                        <div className="stage-header" draggable="true" onDragStart={(e) => handleDragStartStage(e, stage.id)}>
-                          <div className="stage-title">
-                            <input type="text" value={stage.name} onChange={(e) => handleRenameStage(stage.id, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', outline: 'none' }} />
+              <div className="panel-content" style={activeProjectView === 'gantt' ? { padding: 0, overflow: 'hidden' } : {}}>
+                {activeProjectView === 'kanban' && (
+                  <div className="map-container">
+                    {projectStages.map(stage => {
+                      const stageTasks = tasks.filter(t => t.stage_id === stage.id);
+                      return (
+                        <div key={stage.id} className={`stage-column ${draggedStageId === stage.id ? 'dragging' : ''}`} onDragOver={handleDragOverStage} onDrop={(e) => handleDropStage(e, stage.id)}>
+                          <div className="stage-header" draggable="true" onDragStart={(e) => handleDragStartStage(e, stage.id)}>
+                            <div className="stage-title">
+                              <input type="text" value={stage.name} onChange={(e) => handleRenameStage(stage.id, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', outline: 'none' }} />
+                            </div>
+                            <div className="stage-stats">{stageTasks.length} задач</div>
                           </div>
-                          <div className="stage-stats">{stageTasks.length} задач</div>
-                        </div>
-                        <div className="task-list">
-                          {stageTasks.map(task => {
-                            const assignee = getUser(task.assignee_id);
-                            return (
-                              <div key={task.id} className="task-card" data-status={task.status} onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}>
-                                {task.is_modified && <div className="modified-indicator"></div>}
-                                <div className="task-title">{task.name}</div>
-                                <div className="task-meta">
-                                  <span className={`status-badge ${task.status}`}>{statusLabels[task.status]}</span>
-                                  <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                                    <span>{formatDate(task.date)}</span>
-                                    {assignee && <div className="avatar sm" title={assignee.name || assignee.email} style={{backgroundColor: assignee.avatar_color}}>{getUserInitials(assignee.name || assignee.email)}</div>}
+                          <div className="task-list">
+                            {stageTasks.map(task => {
+                              const assignee = getUser(task.assignee_id);
+                              return (
+                                <div key={task.id} className="task-card" data-status={task.status} onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}>
+                                  {task.is_modified && <div className="modified-indicator"></div>}
+                                  <div className="task-title">{task.name}</div>
+                                  <div className="task-meta">
+                                    <span className={`status-badge ${task.status}`}>{statusLabels[task.status]}</span>
+                                    <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                                      <span>{formatDate(task.date)}</span>
+                                      {assignee && <div className="avatar sm" title={assignee.name || assignee.email} style={{backgroundColor: assignee.avatar_color}}>{getUserInitials(assignee.name || assignee.email)}</div>}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
+                          <button className="btn" style={{marginTop: '0.5rem', background: 'transparent', border: '1px dashed var(--panel-border)', color: 'var(--text-secondary)'}} onClick={() => handleCreateTask(stage.id)}>
+                            + Добавить задачу
+                          </button>
                         </div>
-                        <button className="btn" style={{marginTop: '0.5rem', background: 'transparent', border: '1px dashed var(--panel-border)', color: 'var(--text-secondary)'}} onClick={() => handleCreateTask(stage.id)}>
-                          + Добавить задачу
-                        </button>
-                      </div>
-                    );
-                  })}
-                  <div className="add-stage-btn" onClick={handleAddStage}>+ Добавить этап</div>
-                </div>
+                      );
+                    })}
+                    <div className="add-stage-btn" onClick={handleAddStage}>+ Добавить этап</div>
+                  </div>
+                )}
+                {activeProjectView === 'gantt' && (
+                  <GanttChart 
+                    tasks={tasks.filter(t => projectStages.some(s => s.id === t.stage_id))} 
+                    stages={projectStages} 
+                    onSelectTask={(task) => handleSelectTask(task)} 
+                  />
+                )}
               </div>
             </>
           )}
         </main>
 
-        <aside className="glass-panel sidebar-right" style={{ left: panelPos.x, top: panelPos.y, display: (selectedTask && activeView === 'map') ? 'flex' : 'none' }} onClick={(e) => e.stopPropagation()}>
-          <div className="panel-header" onMouseDown={handlePanelDragStart}>
-            <h2>Свойства задачи</h2>
-            <button className="btn btn-icon" onClick={() => setSelectedTaskId(null)}>✕</button>
-          </div>
-          {selectedTask && (
-            <div className="panel-content" style={{paddingBottom: '2rem'}}>
-              <div className="detail-section">
-                <div className="detail-label">Этап: {stages.find(s => s.id === selectedTask.stage_id)?.name}</div>
-                <textarea className="edit-textarea" value={editName} onChange={(e) => setEditName(e.target.value)} style={{fontSize: '1.25rem', fontWeight: '600', padding: '0.25rem', border: '1px solid transparent', borderBottomColor: 'var(--panel-border)', borderRadius: '0', background: 'transparent', minHeight: '36px'}} />
-              </div>
-
-              <div className="detail-section" style={{display: 'flex', gap: '1rem'}}>
-                <div style={{flex: 1}}>
-                  <div className="detail-label">Статус</div>
-                  <select className="edit-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
-                    <option value="planned">План</option>
-                    <option value="in-progress">В работе</option>
-                    <option value="review">Проверка</option>
-                    <option value="done">Готово</option>
-                    <option value="overdue">Просрочено</option>
-                  </select>
-                </div>
-                <div style={{flex: 1}}>
-                  <div className="detail-label">Срок</div>
-                  <input type="date" className="edit-select" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="detail-section">
-                <div className="detail-label">Ответственный</div>
-                <select className="edit-select" value={editAssigneeId} onChange={(e) => setEditAssigneeId(e.target.value)}>
-                  <option value="">Не назначен</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>{user.name || user.email}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="detail-section">
-                <div className="detail-label">Описание</div>
-                <textarea className="edit-textarea" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Добавьте описание задачи..." />
-              </div>
-
-              <div className="detail-section">
-                <div className="detail-label">Чек-лист</div>
-                <div style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem'}}>
-                  <input type="text" className="auth-input" style={{marginBottom: 0, flex: 1}} value={newChecklistItemText} onChange={e => setNewChecklistItemText(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddChecklistItem()} placeholder="Новый пункт..." />
-                  <button className="btn btn-primary" onClick={handleAddChecklistItem}>+</button>
-                </div>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-                  {editChecklist.map((item, i) => (
-                    <div key={i} style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                      <input type="checkbox" checked={item.done} onChange={() => handleToggleChecklistItem(i)} />
-                      <span style={{flex: 1, textDecoration: item.done ? 'line-through' : 'none', color: item.done ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{item.text}</span>
-                      <button className="btn btn-icon" onClick={() => handleDeleteChecklistItem(i)}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="detail-section">
-                <div className="detail-label">Вложения</div>
-                <div 
-                  className={`attachment-zone ${isDragOverDropZone ? 'dragover' : ''}`}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragOverDropZone(true); }}
-                  onDragLeave={() => setIsDragOverDropZone(false)}
-                  onDrop={handleFileDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  Перетащите файлы сюда или нажмите для выбора
-                  <input type="file" multiple hidden ref={fileInputRef} onChange={handleFileInput} />
-                </div>
-                <div className="attachment-list" style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem'}}>
-                  {editAttachments.map(att => (
-                    <div key={att.id} className="attachment-item" style={{position: 'relative', width: '100px', height: '100px', background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--panel-border)', overflow: 'hidden'}}>
-                      <button className="btn btn-icon" style={{position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.5)', color: 'white', width: '20px', height: '20px', minWidth: '20px', zIndex: 10}} onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(att.id); }}>✕</button>
-                      
-                      {att.previewUrl ? (
-                        <img src={att.previewUrl} alt={att.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-                      ) : (
-                        <div style={{textAlign: 'center'}}>
-                          <div style={{fontWeight: 'bold', fontSize: '1rem', color: 'var(--text-primary)'}}>{att.ext}</div>
-                          <div style={{fontSize: '0.7rem', color: 'var(--text-secondary)'}}>{att.size}</div>
-                        </div>
-                      )}
-                      
-                      {!att.previewUrl && (
-                        <div style={{position: 'absolute', bottom: '4px', fontSize: '0.7rem', color: 'var(--text-secondary)', width: '90%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center'}} title={att.name}>{att.name}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="detail-section">
-                 <button className="btn btn-primary" style={{width: '100%'}} onClick={handleUpdateTask}>Сохранить изменения</button>
-              </div>
-
-            </div>
-          )}
-        </aside>
+        {(selectedTask && activeView === 'map') && (
+           <div style={{ position: 'absolute', left: panelPos.x, top: panelPos.y, zIndex: 100, display: 'flex' }} onMouseDown={handlePanelDragStart}>
+              <TaskSidebar 
+                taskId={selectedTask.id} 
+                onClose={() => setSelectedTaskId(null)} 
+                currentUser={currentUser} 
+                users={users} 
+                stages={stages} 
+                onTaskUpdated={(updatedTask) => setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t))} 
+              />
+           </div>
+        )}
       </div>
     </div>
   );

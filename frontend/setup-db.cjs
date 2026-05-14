@@ -10,6 +10,7 @@ async function run() {
     await client.connect();
     console.log("Connected to Supabase DB");
     
+    // 1. Создаем таблицу профилей, если ее нет
     await client.query(`
       CREATE TABLE IF NOT EXISTS profiles (
         id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
@@ -18,6 +19,7 @@ async function run() {
         phone TEXT,
         role TEXT DEFAULT 'Сотрудник', 
         avatar_color TEXT DEFAULT '#3b82f6',
+        avatar_url TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
       );
 
@@ -33,7 +35,6 @@ async function run() {
       $$ LANGUAGE plpgsql SECURITY DEFINER;
     `);
 
-    // Drop the trigger if it exists first
     await client.query(`
       DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
     `);
@@ -43,8 +44,8 @@ async function run() {
         AFTER INSERT ON auth.users
         FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
     `);
-    
-    // Also, let's insert the current user into the profiles table if they aren't already there
+
+    // 2. Добавляем текущих пользователей в профили
     await client.query(`
       INSERT INTO public.profiles (id, email, role, name)
       SELECT id, email, 'Администратор', email
@@ -52,11 +53,108 @@ async function run() {
       ON CONFLICT (id) DO NOTHING;
     `);
 
-    console.log("Profiles table and trigger created successfully.");
+    console.log("Profiles table and trigger setup done.");
+
+    // 3. Создаем таблицы для новых сущностей
+    await client.query(`
+      -- Проекты
+      CREATE TABLE IF NOT EXISTS projects (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        owner_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+        start_date DATE,
+        end_date DATE,
+        status TEXT DEFAULT 'Планируется',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+      );
+
+      -- Этапы (Stages)
+      CREATE TABLE IF NOT EXISTS stages (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT,
+        order_index INTEGER DEFAULT 0,
+        start_date DATE,
+        end_date DATE,
+        status TEXT DEFAULT 'Планируется',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+      );
+
+      -- Задачи
+      CREATE TABLE IF NOT EXISTS tasks (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+        stage_id UUID REFERENCES public.stages(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        description TEXT,
+        assignee_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+        start_date DATE,
+        due_date DATE,
+        status TEXT DEFAULT 'Запланировано',
+        priority TEXT DEFAULT 'Средний',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+      );
+
+      -- Подзадачи (Subtasks)
+      CREATE TABLE IF NOT EXISTS subtasks (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        is_completed BOOLEAN DEFAULT false,
+        order_index INTEGER DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+      );
+
+      -- Связи задач (Для Диаграммы Ганта)
+      CREATE TABLE IF NOT EXISTS task_dependencies (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
+        depends_on_task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
+        dependency_type TEXT DEFAULT 'finish_to_start',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+      );
+
+      -- Комментарии
+      CREATE TABLE IF NOT EXISTS comments (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
+        author_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+      );
+
+      -- Файлы к задачам
+      CREATE TABLE IF NOT EXISTS task_files (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
+        uploader_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+        file_name TEXT NOT NULL,
+        file_url TEXT NOT NULL,
+        file_size INTEGER,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+      );
+
+      -- Учет времени
+      CREATE TABLE IF NOT EXISTS time_logs (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+        hours NUMERIC(5, 2) NOT NULL,
+        log_date DATE NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+      );
+    `);
+
+    console.log("All necessary tables created successfully!");
+
   } catch (err) {
     console.error("Error setting up DB:", err);
   } finally {
     await client.end();
   }
 }
+
 run();
