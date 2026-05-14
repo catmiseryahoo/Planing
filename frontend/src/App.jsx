@@ -62,6 +62,9 @@ function App() {
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('Сотрудник');
 
+  const [adminEditingUser, setAdminEditingUser] = useState(null);
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState('');
+
   const [isDragOverDropZone, setIsDragOverDropZone] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -108,6 +111,7 @@ function App() {
         setProfilePhone(me.phone || '');
         setProfileTelegram(me.telegram || '');
         setProfileAvatarColor(me.avatar_color || '#3b82f6');
+        setProfileAvatarUrl(me.avatar_url || '');
       }
     } catch (error) {
       console.error(error);
@@ -155,7 +159,7 @@ function App() {
       return;
     }
 
-    const updates = { name: profileName, phone: profilePhone, telegram: profileTelegram, avatar_color: profileAvatarColor };
+    const updates = { name: profileName, phone: profilePhone, telegram: profileTelegram, avatar_color: profileAvatarColor, avatar_url: profileAvatarUrl };
     const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
     if (!error) {
       setCurrentUser({ ...currentUser, ...updates });
@@ -277,6 +281,23 @@ function App() {
     setIsDragOverDropZone(false);
   };
 
+  const hasTaskChanges = () => {
+    if (!selectedTask) return false;
+    return editName !== (selectedTask.name || '') ||
+           editStatus !== (selectedTask.status || 'planned') ||
+           editAssigneeId !== (selectedTask.assignee_id || '') ||
+           editDate !== (selectedTask.date || '') ||
+           editDesc !== (selectedTask.desc || '') ||
+           JSON.stringify(editChecklist) !== JSON.stringify(selectedTask.checklist || []) ||
+           JSON.stringify(editAttachments) !== JSON.stringify(selectedTask.attachments || []);
+  };
+
+  const handleMapBackgroundClick = () => {
+    if (selectedTaskId && !hasTaskChanges()) {
+      setSelectedTaskId(null);
+    }
+  };
+
   const handleAddProject = async () => {
     if (currentUser.role !== 'Администратор' && currentUser.role !== 'Менеджер проектов') {
       alert('У вас нет прав для создания проектов');
@@ -381,6 +402,7 @@ function App() {
     
     await supabase.from('tasks').update(updates).eq('id', selectedTask.id);
     setTasks(tasks.map(t => t.id === selectedTask.id ? { ...t, ...updates } : t));
+    setSelectedTaskId(null);
   };
 
   const handleAddComment = async () => {
@@ -418,8 +440,8 @@ function App() {
               <span className="user-name">{currentUser.name || currentUser.email}</span>
               <span className="user-role">{currentUser.role}</span>
             </div>
-            <div className="avatar" style={{backgroundColor: currentUser.avatar_color || '#3b82f6'}}>
-              {getUserInitials(currentUser.name || currentUser.email)}
+            <div className="avatar" style={{backgroundColor: currentUser.avatar_color || '#3b82f6', backgroundImage: currentUser.avatar_url ? `url(${currentUser.avatar_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}}>
+              {!currentUser.avatar_url && getUserInitials(currentUser.name || currentUser.email)}
             </div>
           </div>
           
@@ -456,7 +478,7 @@ function App() {
           </aside>
         )}
 
-        <main className="glass-panel main-content">
+        <main className="glass-panel main-content" onClick={handleMapBackgroundClick}>
           
           {/* PROFILE VIEW */}
           {activeView === 'profile' && (
@@ -496,15 +518,30 @@ function App() {
                   </div>
                 </div>
                 <div className="detail-section">
-                  <div className="detail-label">Цвет профиля (аватар)</div>
-                  <div style={{display:'flex', gap:'0.5rem', marginTop:'0.5rem'}}>
-                    {['#3b82f6', '#ec4899', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444'].map(color => (
-                      <div 
-                        key={color} 
-                        style={{width:'32px', height:'32px', borderRadius:'50%', backgroundColor: color, cursor:'pointer', border: profileAvatarColor === color ? '2px solid white' : '2px solid transparent'}}
-                        onClick={() => setProfileAvatarColor(color)}
-                      />
-                    ))}
+                  <div className="detail-label">Цвет профиля или фото (аватар)</div>
+                  <div style={{display:'flex', gap:'1rem', alignItems:'center', marginTop:'0.5rem'}}>
+                    {profileAvatarUrl ? (
+                      <img src={profileAvatarUrl} alt="avatar" style={{width:'48px', height:'48px', borderRadius:'50%', objectFit:'cover', border:'2px solid var(--panel-border)'}} />
+                    ) : (
+                      <div style={{width:'48px', height:'48px', borderRadius:'50%', backgroundColor: profileAvatarColor || '#ccc', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', fontWeight:'bold', color:'white'}}>
+                        {getUserInitials(currentUser.name || currentUser.email)}
+                      </div>
+                    )}
+                    <div style={{flex: 1}}>
+                      <input type="file" accept="image/*" onChange={(e) => {
+                         if (e.target.files && e.target.files[0]) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => { setProfileAvatarUrl(ev.target.result); };
+                            reader.readAsDataURL(e.target.files[0]);
+                         }
+                      }} style={{fontSize:'0.8rem'}} />
+                      <div style={{fontSize:'0.75rem', color:'var(--text-secondary)', marginTop:'0.25rem'}}>Или цвет (если нет фото):</div>
+                      <div style={{display:'flex', gap:'0.25rem', marginTop:'0.25rem'}}>
+                        {['#3b82f6', '#ec4899', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444'].map(color => (
+                          <div key={color} style={{width:'24px', height:'24px', borderRadius:'50%', backgroundColor: color, cursor:'pointer', border: profileAvatarColor === color ? '2px solid white' : '2px solid transparent'}} onClick={() => { setProfileAvatarColor(color); setProfileAvatarUrl(''); }} />
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <button className="btn btn-primary" onClick={handleUpdateProfile}>Сохранить изменения</button>
@@ -522,14 +559,18 @@ function App() {
                   <h3 style={{marginBottom: '1rem'}}>Пользователи системы</h3>
                   <table className="admin-table">
                     <thead>
-                      <tr><th>Сотрудник</th><th>Email</th><th>Телефон</th><th>Роль в системе</th></tr>
+                      <tr><th>Сотрудник</th><th>Email</th><th>Телефон</th><th>Действия</th></tr>
                     </thead>
                     <tbody>
                       {users.map(u => (
                         <tr key={u.id}>
                           <td>
                             <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
-                              <div className="avatar sm" style={{backgroundColor: u.avatar_color || '#ccc'}}>{getUserInitials(u.name || u.email)}</div>
+                              {u.avatar_url ? (
+                                <img src={u.avatar_url} alt="avatar" className="avatar sm" style={{objectFit: 'cover'}} />
+                              ) : (
+                                <div className="avatar sm" style={{backgroundColor: u.avatar_color || '#ccc'}}>{getUserInitials(u.name || u.email)}</div>
+                              )}
                               {u.name || 'Без имени'}
                               {u.id === currentUser.id && ' (Вы)'}
                             </div>
@@ -537,19 +578,7 @@ function App() {
                           <td>{u.email}</td>
                           <td>{u.phone || '—'}</td>
                           <td>
-                            <select 
-                              className="edit-select" 
-                              style={{marginBottom:0, height:'32px', width:'auto'}} 
-                              value={u.role}
-                              onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                              disabled={u.id === currentUser.id} // Нельзя понизить себя
-                            >
-                              <option value="Администратор">Администратор</option>
-                              <option value="Менеджер проектов">Менеджер проектов</option>
-                              <option value="Дизайнер">Дизайнер</option>
-                              <option value="Разработчик">Разработчик</option>
-                              <option value="Сотрудник">Сотрудник</option>
-                            </select>
+                            <button className="btn btn-icon" onClick={() => setAdminEditingUser(u)} title="Редактировать">✏️</button>
                           </td>
                         </tr>
                       ))}
@@ -558,32 +587,101 @@ function App() {
                 </div>
 
                 <div style={{flex: 1, borderLeft: '1px solid var(--panel-border)', paddingLeft: '2rem'}}>
-                  <h3 style={{marginBottom: '1rem'}}>Регистрация нового сотрудника</h3>
-                  <form onSubmit={handleCreateUser} style={{display:'flex', flexDirection:'column', gap: '1rem'}}>
+                  {adminEditingUser ? (
                     <div>
-                      <div className="detail-label">ФИО сотрудника</div>
-                      <input className="auth-input" style={{marginBottom: 0}} type="text" placeholder="Алексей Смирнов" value={newUserName} onChange={e=>setNewUserName(e.target.value)} required />
+                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '1rem'}}>
+                        <h3>Редактирование: {adminEditingUser.name}</h3>
+                        <button className="btn btn-icon" onClick={() => setAdminEditingUser(null)}>✕</button>
+                      </div>
+                      <div className="detail-section">
+                        <div className="detail-label">ФИО</div>
+                        <input className="edit-select" value={adminEditingUser.name || ''} onChange={e => setAdminEditingUser({...adminEditingUser, name: e.target.value})} />
+                      </div>
+                      <div className="detail-section">
+                        <div className="detail-label">Телефон</div>
+                        <input className="edit-select" value={adminEditingUser.phone || ''} onChange={e => setAdminEditingUser({...adminEditingUser, phone: e.target.value})} />
+                      </div>
+                      <div className="detail-section">
+                        <div className="detail-label">Роль</div>
+                        <select className="edit-select" value={adminEditingUser.role} onChange={e => setAdminEditingUser({...adminEditingUser, role: e.target.value})} disabled={adminEditingUser.id === currentUser.id}>
+                          <option value="Администратор">Администратор</option>
+                          <option value="Менеджер проектов">Менеджер проектов</option>
+                          <option value="Дизайнер">Дизайнер</option>
+                          <option value="Разработчик">Разработчик</option>
+                          <option value="Сотрудник">Сотрудник</option>
+                        </select>
+                      </div>
+                      <div className="detail-section">
+                        <div className="detail-label">Фото сотрудника</div>
+                        <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
+                           {adminEditingUser.avatar_url ? (
+                              <img src={adminEditingUser.avatar_url} alt="avatar" style={{width:'48px', height:'48px', borderRadius:'50%', objectFit:'cover', border:'2px solid var(--panel-border)'}} />
+                           ) : (
+                              <div style={{width:'48px', height:'48px', borderRadius:'50%', backgroundColor: adminEditingUser.avatar_color || '#ccc', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', fontWeight:'bold', color:'white'}}>
+                                {getUserInitials(adminEditingUser.name || adminEditingUser.email)}
+                              </div>
+                           )}
+                           <div style={{flex: 1}}>
+                              <input type="file" accept="image/*" onChange={(e) => {
+                                 if (e.target.files && e.target.files[0]) {
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => {
+                                        setAdminEditingUser({...adminEditingUser, avatar_url: ev.target.result});
+                                    };
+                                    reader.readAsDataURL(e.target.files[0]);
+                                 }
+                              }} style={{fontSize:'0.8rem'}} />
+                              <div style={{fontSize:'0.75rem', color:'var(--text-secondary)', marginTop:'0.25rem'}}>Или цвет (если нет фото):</div>
+                              <div style={{display:'flex', gap:'0.25rem', marginTop:'0.25rem'}}>
+                                {['#3b82f6', '#ec4899', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444'].map(color => (
+                                  <div key={color} style={{width:'20px', height:'20px', borderRadius:'50%', backgroundColor: color, cursor:'pointer', border: adminEditingUser.avatar_color === color ? '2px solid white' : '2px solid transparent'}} onClick={() => setAdminEditingUser({...adminEditingUser, avatar_color: color, avatar_url: ''})} />
+                                ))}
+                              </div>
+                           </div>
+                        </div>
+                      </div>
+                      <button className="btn btn-primary" onClick={async () => {
+                          const { id, name, phone, role, avatar_color, avatar_url } = adminEditingUser;
+                          const { error } = await supabase.from('profiles').update({ name, phone, role, avatar_color, avatar_url }).eq('id', id);
+                          if (!error) {
+                             setUsers(users.map(u => u.id === id ? adminEditingUser : u));
+                             if (id === currentUser.id) setCurrentUser({...currentUser, name, phone, role, avatar_color, avatar_url});
+                             setAdminEditingUser(null);
+                          } else {
+                             alert('Ошибка: ' + error.message);
+                          }
+                      }}>Сохранить сотрудника</button>
                     </div>
+                  ) : (
                     <div>
-                      <div className="detail-label">Email для входа</div>
-                      <input className="auth-input" style={{marginBottom: 0}} type="email" placeholder="alex@orbite.com" value={newUserEmail} onChange={e=>setNewUserEmail(e.target.value)} required />
+                      <h3 style={{marginBottom: '1rem'}}>Регистрация нового сотрудника</h3>
+                      <form onSubmit={handleCreateUser} style={{display:'flex', flexDirection:'column', gap: '1rem'}}>
+                        <div>
+                          <div className="detail-label">ФИО сотрудника</div>
+                          <input className="auth-input" style={{marginBottom: 0}} type="text" placeholder="Алексей Смирнов" value={newUserName} onChange={e=>setNewUserName(e.target.value)} required />
+                        </div>
+                        <div>
+                          <div className="detail-label">Email для входа</div>
+                          <input className="auth-input" style={{marginBottom: 0}} type="email" placeholder="alex@orbite.com" value={newUserEmail} onChange={e=>setNewUserEmail(e.target.value)} required />
+                        </div>
+                        <div>
+                          <div className="detail-label">Временный пароль</div>
+                          <input className="auth-input" style={{marginBottom: 0}} type="password" placeholder="Пароль (минимум 6 символов)" value={newUserPassword} onChange={e=>setNewUserPassword(e.target.value)} required minLength={6} />
+                        </div>
+                        <div>
+                          <div className="detail-label">Роль в системе</div>
+                          <select className="edit-select" value={newUserRole} onChange={e=>setNewUserRole(e.target.value)}>
+                            <option value="Сотрудник">Сотрудник</option>
+                            <option value="Менеджер проектов">Менеджер проектов</option>
+                            <option value="Дизайнер">Дизайнер</option>
+                            <option value="Разработчик">Разработчик</option>
+                            <option value="Администратор">Администратор</option>
+                          </select>
+                        </div>
+                        <button className="btn btn-primary" type="submit">Создать аккаунт</button>
+                      </form>
                     </div>
-                    <div>
-                      <div className="detail-label">Временный пароль</div>
-                      <input className="auth-input" style={{marginBottom: 0}} type="password" placeholder="Пароль (минимум 6 символов)" value={newUserPassword} onChange={e=>setNewUserPassword(e.target.value)} required minLength={6} />
-                    </div>
-                    <div>
-                      <div className="detail-label">Роль в системе</div>
-                      <select className="edit-select" value={newUserRole} onChange={e=>setNewUserRole(e.target.value)}>
-                        <option value="Сотрудник">Сотрудник</option>
-                        <option value="Менеджер проектов">Менеджер проектов</option>
-                        <option value="Дизайнер">Дизайнер</option>
-                        <option value="Разработчик">Разработчик</option>
-                        <option value="Администратор">Администратор</option>
-                      </select>
-                    </div>
-                    <button className="btn btn-primary" type="submit">Создать аккаунт</button>
-                  </form>
+                  )}
                 </div>
                 
               </div>
@@ -615,7 +713,7 @@ function App() {
                           {stageTasks.map(task => {
                             const assignee = getUser(task.assignee_id);
                             return (
-                              <div key={task.id} className="task-card" data-status={task.status} onClick={() => handleSelectTask(task)}>
+                              <div key={task.id} className="task-card" data-status={task.status} onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}>
                                 {task.is_modified && <div className="modified-indicator"></div>}
                                 <div className="task-title">{task.name}</div>
                                 <div className="task-meta">
@@ -642,7 +740,7 @@ function App() {
           )}
         </main>
 
-        <aside className="glass-panel sidebar-right" style={{ left: panelPos.x, top: panelPos.y, display: (selectedTask && activeView === 'map') ? 'flex' : 'none' }}>
+        <aside className="glass-panel sidebar-right" style={{ left: panelPos.x, top: panelPos.y, display: (selectedTask && activeView === 'map') ? 'flex' : 'none' }} onClick={(e) => e.stopPropagation()}>
           <div className="panel-header" onMouseDown={handlePanelDragStart}>
             <h2>Свойства задачи</h2>
             <button className="btn btn-icon" onClick={() => setSelectedTaskId(null)}>✕</button>
