@@ -64,6 +64,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     const { data, error } = await supabase.from('tasks').update(updates).eq('id', task.id).select();
     if (!error && data) {
       onTaskUpdated(data[0]);
+      onClose(); // Закрываем панель после сохранения
     }
   };
 
