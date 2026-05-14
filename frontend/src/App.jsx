@@ -352,7 +352,17 @@ function App() {
   const handleFiles = (files) => {
     const newAttachments = Array.from(files).map(file => {
       let ext = file.name.split('.').pop().toUpperCase();
-      return { id: `att_${Date.now()}_${Math.random()}`, name: file.name, size: file.size < 1024*1024 ? (file.size/1024).toFixed(1)+' KB' : (file.size/(1024*1024)).toFixed(1)+' MB', ext: ext.substring(0,3) };
+      let previewUrl = null;
+      if (file.type.startsWith('image/')) {
+        previewUrl = URL.createObjectURL(file);
+      }
+      return { 
+        id: `att_${Date.now()}_${Math.random()}`, 
+        name: file.name, 
+        size: file.size < 1024*1024 ? (file.size/1024).toFixed(1)+' KB' : (file.size/(1024*1024)).toFixed(1)+' MB', 
+        ext: ext.substring(0,3),
+        previewUrl
+      };
     });
     setEditAttachments([...editAttachments, ...newAttachments]);
   };
@@ -674,6 +684,57 @@ function App() {
               <div className="detail-section">
                 <div className="detail-label">Описание</div>
                 <textarea className="edit-textarea" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Добавьте описание задачи..." />
+              </div>
+
+              <div className="detail-section">
+                <div className="detail-label">Чек-лист</div>
+                <div style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem'}}>
+                  <input type="text" className="auth-input" style={{marginBottom: 0, flex: 1}} value={newChecklistItemText} onChange={e => setNewChecklistItemText(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddChecklistItem()} placeholder="Новый пункт..." />
+                  <button className="btn btn-primary" onClick={handleAddChecklistItem}>+</button>
+                </div>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                  {editChecklist.map((item, i) => (
+                    <div key={i} style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                      <input type="checkbox" checked={item.done} onChange={() => handleToggleChecklistItem(i)} />
+                      <span style={{flex: 1, textDecoration: item.done ? 'line-through' : 'none', color: item.done ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{item.text}</span>
+                      <button className="btn btn-icon" onClick={() => handleDeleteChecklistItem(i)}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="detail-section">
+                <div className="detail-label">Вложения</div>
+                <div 
+                  className={`attachment-zone ${isDragOverDropZone ? 'dragover' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragOverDropZone(true); }}
+                  onDragLeave={() => setIsDragOverDropZone(false)}
+                  onDrop={handleFileDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Перетащите файлы сюда или нажмите для выбора
+                  <input type="file" multiple hidden ref={fileInputRef} onChange={handleFileInput} />
+                </div>
+                <div className="attachment-list" style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem'}}>
+                  {editAttachments.map(att => (
+                    <div key={att.id} className="attachment-item" style={{position: 'relative', width: '100px', height: '100px', background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--panel-border)', overflow: 'hidden'}}>
+                      <button className="btn btn-icon" style={{position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.5)', color: 'white', width: '20px', height: '20px', minWidth: '20px', zIndex: 10}} onClick={(e) => { e.stopPropagation(); handleDeleteAttachment(att.id); }}>✕</button>
+                      
+                      {att.previewUrl ? (
+                        <img src={att.previewUrl} alt={att.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                      ) : (
+                        <div style={{textAlign: 'center'}}>
+                          <div style={{fontWeight: 'bold', fontSize: '1rem', color: 'var(--text-primary)'}}>{att.ext}</div>
+                          <div style={{fontSize: '0.7rem', color: 'var(--text-secondary)'}}>{att.size}</div>
+                        </div>
+                      )}
+                      
+                      {!att.previewUrl && (
+                        <div style={{position: 'absolute', bottom: '4px', fontSize: '0.7rem', color: 'var(--text-secondary)', width: '90%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center'}} title={att.name}>{att.name}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="detail-section">
