@@ -38,16 +38,20 @@ export default function GanttChart({ tasks, stages, onSelectTask }) {
 
   const getTaskStyle = (task) => {
     const start = task.start_date ? new Date(task.start_date) : new Date();
-    const end = (task.date || task.due_date) ? new Date(task.date || task.due_date) : new Date(start.getTime() + 86400000*2); // По умолчанию 2 дня
+    const end = (task.date || task.due_date) ? new Date(task.date || task.due_date) : new Date(start.getTime() + 86400000*2);
 
     const startOffset = Math.max(0, (start.getTime() - minDate.getTime()) / (1000 * 3600 * 24));
     let duration = (end.getTime() - start.getTime()) / (1000 * 3600 * 24);
     if (duration < 1) duration = 1;
 
+    // Используем цвет этапа
+    const stage = stages.find(s => s.id === task.stage_id);
+    const barColor = stage?.color || getStatusColor(task.status);
+
     return {
-      left: `${startOffset * 40}px`, // 40px на день
+      left: `${startOffset * 40}px`,
       width: `${duration * 40}px`,
-      backgroundColor: getStatusColor(task.status)
+      backgroundColor: barColor
     };
   };
 
@@ -82,7 +86,10 @@ export default function GanttChart({ tasks, stages, onSelectTask }) {
           
           return (
             <div key={`stage-${stage.id}`} className="gantt-stage-group">
-              <div className="gantt-stage-title">{stage.name}</div>
+              <div className="gantt-stage-title">
+                <span style={{display: 'inline-block', width: '12px', height: '12px', borderRadius: '3px', backgroundColor: stage.color || '#3b82f6', marginRight: '0.5rem'}}></span>
+                {stage.name}
+              </div>
               {stageTasks.map(task => (
                 <div key={task.id} className="gantt-row" onClick={(e) => { e.stopPropagation(); onSelectTask(task); }}>
                   <div className="gantt-row-title">{task.name}</div>
