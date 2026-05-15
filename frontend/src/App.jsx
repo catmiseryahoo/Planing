@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase, supabaseAdmin } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import AuthScreen from './components/Auth/AuthScreen';
 import ProfilePanel from './components/Profile/ProfilePanel';
 import TaskSidebar from './components/Task/TaskSidebar';
@@ -136,33 +136,26 @@ function App() {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     if (currentUser?.role !== 'Администратор') return;
-    
-    // Create the auth user securely as an admin
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email: newUserEmail,
-      password: newUserPassword,
-      email_confirm: true
+
+    const { error } = await supabase.functions.invoke('create-user', {
+      body: {
+        email: newUserEmail,
+        password: newUserPassword,
+        name: newUserName,
+        role: newUserRole
+      }
     });
-    
+
     if (error) {
       alert("Ошибка при создании сотрудника: " + error.message);
       return;
     }
-    
-    // The DB trigger automatically creates a row in 'profiles'. 
-    // We just need to update it with the name and role.
-    if (data && data.user) {
-      await supabaseAdmin.from('profiles').update({
-        name: newUserName,
-        role: newUserRole
-      }).eq('id', data.user.id);
-      
-      alert("Сотрудник успешно создан и добавлен в базу!");
-      setNewUserEmail('');
-      setNewUserPassword('');
-      setNewUserName('');
-      fetchData(); // Refresh the users list
-    }
+
+    alert("Сотрудник успешно создан и добавлен в базу!");
+    setNewUserEmail('');
+    setNewUserPassword('');
+    setNewUserName('');
+    fetchData();
   };
 
   const handleRoleChange = async (userId, newRole) => {

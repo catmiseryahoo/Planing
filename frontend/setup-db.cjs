@@ -1,7 +1,13 @@
 const { Client } = require('pg');
 
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL is required. Example: DATABASE_URL=postgresql://... node setup-db.cjs');
+}
+
 const client = new Client({
-  connectionString: 'postgresql://postgres:sakwym-mEmpap-6zazca@db.wqfpksyemvaxncsqwuzm.supabase.co:5432/postgres',
+  connectionString,
   ssl: { rejectUnauthorized: false }
 });
 
