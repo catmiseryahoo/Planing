@@ -83,7 +83,12 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     };
     const { data, error } = await supabase.from('tasks').update(updates).eq('id', task.id).select();
     if (!error && data) {
-      onTaskUpdated(data[0]);
+      onTaskUpdated(data[0], {
+        subtask_count: subtasks.length + (newSubtaskTitle.trim() ? 1 : 0),
+        comment_count: comments.length + (commentText.trim() ? 1 : 0),
+        file_count: files.length,
+        is_modified: true
+      });
       onClose(); // Закрываем панель после сохранения
     }
   };
@@ -98,6 +103,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
     if (!error && data) {
       setSubtasks([...subtasks, data[0]]);
+      onTaskUpdated(task, { subtask_count: subtasks.length + 1 });
       setNewSubtaskTitle('');
     }
   };
@@ -122,6 +128,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
     if (!error) {
       setSubtasks(subtasks.filter(s => s.id !== id));
+      onTaskUpdated(task, { subtask_count: Math.max(0, subtasks.length - 1) });
     }
   };
 
@@ -186,6 +193,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
 
         if (data?.[0]) {
           setFiles(currentFiles => [...currentFiles, data[0]]);
+          onTaskUpdated(task, { file_count: files.length + 1 });
         }
       }
     } catch (error) {
@@ -207,6 +215,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
 
     setFiles(files.filter(f => f.id !== file.id));
+    onTaskUpdated(task, { file_count: Math.max(0, files.length - 1) });
   };
 
   const formatFileSize = (size) => {

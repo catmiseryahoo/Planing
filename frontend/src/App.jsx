@@ -21,6 +21,14 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 };
 
+const countByTaskId = (items) => {
+  return (items || []).reduce((acc, item) => {
+    if (!item.task_id) return acc;
+    acc[item.task_id] = (acc[item.task_id] || 0) + 1;
+    return acc;
+  }, {});
+};
+
 function App() {
   const [session, setSession] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -83,16 +91,29 @@ function App() {
   const fetchData = async () => {
     setIsDataLoading(true);
     try {
-      const [projectsRes, stagesRes, tasksRes, profilesRes] = await Promise.all([
+      const [projectsRes, stagesRes, tasksRes, profilesRes, subtasksRes, commentsRes, filesRes] = await Promise.all([
         supabase.from('projects').select('*').order('created_at', { ascending: true }),
         supabase.from('stages').select('*').order('order', { ascending: true }),
         supabase.from('tasks').select('*'),
-        supabase.from('profiles').select('*')
+        supabase.from('profiles').select('*'),
+        supabase.from('subtasks').select('task_id'),
+        supabase.from('comments').select('task_id'),
+        supabase.from('task_files').select('task_id')
       ]);
+
+      const subtaskCounts = countByTaskId(subtasksRes.data);
+      const commentCounts = countByTaskId(commentsRes.data);
+      const fileCounts = countByTaskId(filesRes.data);
+      const tasksWithIndicators = (tasksRes.data || []).map(task => ({
+        ...task,
+        subtask_count: subtaskCounts[task.id] || 0,
+        comment_count: commentCounts[task.id] || 0,
+        file_count: fileCounts[task.id] || 0
+      }));
 
       setProjects(projectsRes.data || []);
       setStages(stagesRes.data || []);
-      setTasks(tasksRes.data || []);
+      setTasks(tasksWithIndicators);
       setUsers(profilesRes.data || []);
 
       if (projectsRes.data?.length > 0 && !activeProjectId) {
@@ -280,7 +301,7 @@ function App() {
     const newTask = { stage_id: stageId, name: 'Новая задача', status: 'planned', assignee_id: currentUser.id, checklist: [], attachments: [], feed: [], is_modified: false };
     const { data, error } = await supabase.from('tasks').insert([newTask]).select();
     if (!error && data) {
-      setTasks([...tasks, data[0]]);
+      setTasks([...tasks, { ...data[0], subtask_count: 0, comment_count: 0, file_count: 0 }]);
       handleSelectTask(data[0]);
     }
   };
@@ -648,7 +669,7 @@ function App() {
                               const assignee = getUser(task.assignee_id);
                               return (
                                 <div key={task.id} className="task-card" data-status={task.status} onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}>
-                                  {task.is_modified && <div className="modified-indicator"></div>}
+                                  {task.is_modified && <div className="modified-indicator" title="В задаче были изменения"></div>}
                                   {currentUser?.role === 'Администратор' && (
                                     <button className="task-delete-btn" title="Удалить задачу" onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}>
                                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -661,6 +682,49 @@ function App() {
                                     </button>
                                   )}
                                   <div className="task-title">{task.name}</div>
+                                  {(task.file_count > 0 || task.subtask_count > 0 || task.comment_count > 0 || task.is_modified) && (
+                                    <div className="task-indicators">
+                                      {task.file_count > 0 && (
+                                        <span className="task-indicator" title={`Файлы: ${task.file_count}`}>
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M21.44 11.05 12 20.49a6 6 0 0 1-8.49-8.49l9.44-9.44a4 4 0 0 1 5.66 5.66l-9.44 9.44a2 2 0 0 1-2.83-2.83l8.49-8.49" />
+                                          </svg>
+                                          {task.file_count}
+                                        </span>
+                                      )}
+                                      {task.subtask_count > 0 && (
+                                        <span className="task-indicator" title={`Подзадачи: ${task.subtask_count}`}>
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M9 11 12 14 22 4" />
+                                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                                          </svg>
+                                          {task.subtask_count}
+                                        </span>
+                                      )}
+                                      {task.comment_count > 0 && (
+                                        <span className="task-indicator" title={`Комментарии: ${task.comment_count}`}>
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+                                          </svg>
+                                          {task.comment_count}
+                                        </span>
+                                      )}
+                                      {task.is_modified && (
+                                        <span className="task-indicator modified" title="В задаче были изменения">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M12 2v4" />
+                                            <path d="M12 18v4" />
+                                            <path d="m4.93 4.93 2.83 2.83" />
+                                            <path d="m16.24 16.24 2.83 2.83" />
+                                            <path d="M2 12h4" />
+                                            <path d="M18 12h4" />
+                                            <path d="m4.93 19.07 2.83-2.83" />
+                                            <path d="m16.24 7.76 2.83-2.83" />
+                                          </svg>
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                   <div className="task-meta">
                                     <span className={`status-badge ${task.status}`}>{statusLabels[task.status]}</span>
                                     <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
@@ -701,7 +765,7 @@ function App() {
                 currentUser={currentUser} 
                 users={users} 
                 stages={stages} 
-                onTaskUpdated={(updatedTask) => setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t))} 
+                onTaskUpdated={(updatedTask, indicatorPatch = {}) => setTasks(tasks.map(t => t.id === updatedTask.id ? { ...t, ...updatedTask, ...indicatorPatch } : t))} 
                 onTaskDeleted={(deletedTaskId) => {
                   setTasks(tasks.filter(t => t.id !== deletedTaskId));
                   setSelectedTaskId(null);
