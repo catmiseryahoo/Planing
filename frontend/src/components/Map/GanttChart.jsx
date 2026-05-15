@@ -38,6 +38,7 @@ export default function GanttChart({ tasks, stages, onSelectTask }) {
 
     return { minDate: min, days: dArray };
   }, [tasks]);
+  const timelineWidth = days.length * dayWidth;
 
   const handleWheel = (e) => {
     if (!e.altKey) return;
@@ -117,14 +118,17 @@ export default function GanttChart({ tasks, stages, onSelectTask }) {
           
           return (
             <div key={`stage-${stage.id}`} className="gantt-stage-group">
-              <div className="gantt-stage-title">
-                <span style={{display: 'inline-block', width: '12px', height: '12px', borderRadius: '3px', backgroundColor: stage.color || '#3b82f6', marginRight: '0.5rem'}}></span>
-                {stage.name}
+              <div className="gantt-stage-title-row">
+                <div className="gantt-stage-title">
+                  <span style={{display: 'inline-block', width: '12px', height: '12px', borderRadius: '3px', backgroundColor: stage.color || '#3b82f6', marginRight: '0.5rem'}}></span>
+                  {stage.name}
+                </div>
+                <div className="gantt-stage-title-timeline" style={{ width: `${timelineWidth}px`, minWidth: `${timelineWidth}px` }} />
               </div>
               {stageTasks.map(task => (
                 <div key={task.id} className="gantt-row" onClick={(e) => { e.stopPropagation(); onSelectTask(task); }}>
                   <div className="gantt-row-title">{task.name}</div>
-                  <div className="gantt-timeline-row">
+                  <div className="gantt-timeline-row" style={{ width: `${timelineWidth}px`, minWidth: `${timelineWidth}px` }}>
                     <div className="gantt-bar" style={getTaskStyle(task)}>
                       <span className="gantt-bar-label">{task.name}</span>
                     </div>

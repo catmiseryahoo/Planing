@@ -151,6 +151,12 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(15, 23, 42, 0.85);
 }
+.sidebar-right.task-stage-panel {
+  border-top: 4px solid var(--task-stage-color);
+}
+.sidebar-right.task-stage-panel .panel-header {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--task-stage-color) 18%, transparent), transparent 70%);
+}
 .sidebar-right .panel-header {
   cursor: grab;
 }
@@ -177,6 +183,105 @@ body {
   padding: 1.5rem;
   overflow-y: auto;
   flex: 1;
+}
+
+.project-overview {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) repeat(3, minmax(120px, 160px));
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(15, 23, 42, 0.35);
+}
+.project-progress-main,
+.overview-metric {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+}
+.project-progress-topline,
+.project-progress-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.overview-label {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+.overview-stage-name {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.3rem;
+  font-weight: 700;
+}
+.overview-stage-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.project-progress-bar,
+.stage-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+.project-progress-bar {
+  margin: 0.75rem 0 0.55rem;
+}
+.project-progress-fill,
+.stage-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+.project-progress-fill {
+  background: linear-gradient(90deg, #22c55e, #3b82f6);
+}
+.project-progress-footer {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.overview-metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 82px;
+}
+.overview-value {
+  margin-top: 0.35rem;
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+.overview-metric.danger .overview-value {
+  color: var(--status-overdue-text);
+}
+.health-badge {
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.health-badge.on-track,
+.health-badge.complete {
+  background: var(--status-done);
+  color: var(--status-done-text);
+}
+.health-badge.at-risk {
+  background: var(--status-review);
+  color: var(--status-review-text);
+}
+.health-badge.off-track {
+  background: var(--status-overdue);
+  color: var(--status-overdue-text);
 }
 
 /* Navigation & Tabs */
@@ -317,6 +422,13 @@ body {
 .stage-stats {
   font-size: 0.75rem;
   color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.6rem;
+}
+.stage-progress-track {
+  height: 6px;
 }
 .task-list {
   display: flex;
@@ -451,6 +563,14 @@ body {
   color: var(--text-secondary);
   margin-bottom: 0.5rem;
   font-weight: 600;
+}
+.task-stage-chip {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin: 0 0.35rem 0 0.2rem;
+  vertical-align: -1px;
 }
 .detail-title {
   font-size: 1.25rem;

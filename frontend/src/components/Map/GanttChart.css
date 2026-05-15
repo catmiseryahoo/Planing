@@ -76,7 +76,15 @@
   border-bottom: 1px solid var(--panel-border);
 }
 
+.gantt-stage-title-row {
+  display: flex;
+  min-width: max-content;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .gantt-stage-title {
+  width: 250px;
+  min-width: 250px;
   padding: 0.5rem 1rem;
   background: rgba(255, 255, 255, 0.05);
   font-weight: 600;
@@ -84,6 +92,15 @@
   color: var(--text-primary);
   position: sticky;
   left: 0;
+  z-index: 6;
+  border-right: 1px solid var(--panel-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-stage-title-timeline {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .gantt-row {
@@ -115,7 +132,7 @@
 .gantt-timeline-row {
   position: relative;
   display: flex;
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 40px;
   background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: var(--gantt-day-width, 40px) 100%;

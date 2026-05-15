@@ -236,8 +236,10 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     );
   }
 
+  const taskStage = stages.find(s => s.id === task?.stage_id);
+
   return (
-    <aside className="glass-panel sidebar-right" style={{ display: 'flex' }} onClick={(e) => e.stopPropagation()}>
+    <aside className="glass-panel sidebar-right task-stage-panel" style={{ display: 'flex', '--task-stage-color': taskStage?.color || '#3b82f6' }} onClick={(e) => e.stopPropagation()}>
       <div className="panel-header" onMouseDown={onDragStart} style={{cursor: 'move'}}>
         <h2>Свойства задачи</h2>
         <div style={{display: 'flex', alignItems: 'center', gap: '0.25rem'}} onMouseDown={(e) => e.stopPropagation()}>
@@ -258,7 +260,9 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
       
       <div className="panel-content" style={{paddingBottom: '2rem'}}>
         <div className="detail-section">
-          <div className="detail-label">Этап: {stages.find(s => s.id === task?.stage_id)?.name}</div>
+          <div className="detail-label">
+            Этап: <span className="task-stage-chip" style={{backgroundColor: taskStage?.color || '#3b82f6'}}></span>{taskStage?.name}
+          </div>
           <textarea className="edit-textarea" value={editName} onChange={(e) => setEditName(e.target.value)} style={{fontSize: '1.25rem', fontWeight: '600', padding: '0.25rem', border: '1px solid transparent', borderBottomColor: 'var(--panel-border)', borderRadius: '0', background: 'transparent', minHeight: '36px'}} />
         </div>
 

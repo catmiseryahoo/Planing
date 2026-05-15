@@ -29,6 +29,81 @@ const countByTaskId = (items) => {
   }, {});
 };
 
+const getDateOnly = (dateString) => {
+  if (!dateString) return null;
+  const date = new Date(`${dateString}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getCompletionPercent = (items) => {
+  if (!items.length) return 0;
+  const doneCount = items.filter(task => task.status === 'done').length;
+  return Math.round((doneCount / items.length) * 100);
+};
+
+const getProjectMetrics = (projectStages, projectTasks) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const total = projectTasks.length;
+  const done = projectTasks.filter(task => task.status === 'done').length;
+  const overdue = projectTasks.filter(task => {
+    const due = getDateOnly(task.date || task.due_date);
+    return task.status !== 'done' && (task.status === 'overdue' || (due && due < today));
+  }).length;
+  const dueSoon = projectTasks.filter(task => {
+    const due = getDateOnly(task.date || task.due_date);
+    if (!due || task.status === 'done') return false;
+    const daysLeft = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+    return daysLeft >= 0 && daysLeft <= 2;
+  }).length;
+  const datedTasks = projectTasks.filter(task => getDateOnly(task.date || task.due_date));
+  const shouldBeDone = datedTasks.filter(task => getDateOnly(task.date || task.due_date) <= today).length;
+  const actualProgress = getCompletionPercent(projectTasks);
+  const plannedProgress = datedTasks.length ? Math.round((shouldBeDone / datedTasks.length) * 100) : actualProgress;
+  const lag = plannedProgress - actualProgress;
+
+  const stageSummaries = projectStages.map(stage => {
+    const stageTasks = projectTasks.filter(task => task.stage_id === stage.id);
+    return {
+      ...stage,
+      taskCount: stageTasks.length,
+      doneCount: stageTasks.filter(task => task.status === 'done').length,
+      progress: getCompletionPercent(stageTasks),
+      activeCount: stageTasks.filter(task => ['in-progress', 'review', 'overdue'].includes(task.status)).length
+    };
+  });
+
+  let health = { key: 'on-track', label: 'В графике' };
+  if (total > 0 && actualProgress === 100) {
+    health = { key: 'complete', label: 'Готово' };
+  } else if (overdue > 0 || lag > 15) {
+    health = { key: 'off-track', label: 'Проблема' };
+  } else if (dueSoon > 0 || lag > 5) {
+    health = { key: 'at-risk', label: 'Риск' };
+  }
+
+  const currentStage =
+    health.key === 'complete'
+      ? stageSummaries[stageSummaries.length - 1]
+      : stageSummaries.find(stage => stage.taskCount > 0 && stage.progress < 100 && stage.activeCount > 0) ||
+        stageSummaries.find(stage => stage.taskCount > 0 && stage.progress < 100) ||
+        stageSummaries[0];
+
+  return {
+    total,
+    done,
+    overdue,
+    dueSoon,
+    actualProgress,
+    plannedProgress,
+    lag: Math.max(0, lag),
+    health,
+    currentStage,
+    stageSummaries
+  };
+};
+
 function App() {
   const [session, setSession] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -199,6 +274,8 @@ function App() {
 
   const activeProject = projects.find(p => p.id === activeProjectId);
   const projectStages = stages.filter(s => s.project_id === activeProjectId).sort((a, b) => a.order - b.order);
+  const projectTasks = tasks.filter(t => projectStages.some(s => s.id === t.stage_id));
+  const projectMetrics = getProjectMetrics(projectStages, projectTasks);
   const selectedTask = tasks.find(t => t.id === selectedTaskId);
   
   const getUserInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '?';
@@ -639,11 +716,47 @@ function App() {
                   <button className={`view-tab ${activeProjectView === 'gantt' ? 'active' : ''}`} onClick={() => setActiveProjectView('gantt')}>Диаграмма Ганта</button>
                 </div>
               </div>
+              {activeProject && (
+                <div className="project-overview">
+                  <div className="project-progress-main">
+                    <div className="project-progress-topline">
+                      <div>
+                        <div className="overview-label">Текущий этап</div>
+                        <div className="overview-stage-name">
+                          <span className="overview-stage-dot" style={{backgroundColor: projectMetrics.currentStage?.color || '#3b82f6'}}></span>
+                          {projectMetrics.currentStage?.name || 'Нет этапов'}
+                        </div>
+                      </div>
+                      <div className={`health-badge ${projectMetrics.health.key}`}>{projectMetrics.health.label}</div>
+                    </div>
+                    <div className="project-progress-bar">
+                      <div className="project-progress-fill" style={{width: `${projectMetrics.actualProgress}%`}}></div>
+                    </div>
+                    <div className="project-progress-footer">
+                      <span>{projectMetrics.actualProgress}% выполнено</span>
+                      <span>План на сегодня: {projectMetrics.plannedProgress}%</span>
+                    </div>
+                  </div>
+                  <div className="overview-metric">
+                    <div className="overview-label">Задачи</div>
+                    <div className="overview-value">{projectMetrics.done}/{projectMetrics.total}</div>
+                  </div>
+                  <div className="overview-metric">
+                    <div className="overview-label">Отставание</div>
+                    <div className="overview-value">{projectMetrics.lag}%</div>
+                  </div>
+                  <div className="overview-metric danger">
+                    <div className="overview-label">Просрочено</div>
+                    <div className="overview-value">{projectMetrics.overdue}</div>
+                  </div>
+                </div>
+              )}
               <div className="panel-content" style={activeProjectView === 'gantt' ? { padding: 0, overflow: 'hidden' } : {}}>
                 {activeProjectView === 'kanban' && (
                   <div className="map-container">
                     {projectStages.map(stage => {
                       const stageTasks = tasks.filter(t => t.stage_id === stage.id);
+                      const stageProgress = getCompletionPercent(stageTasks);
                       return (
                         <div key={stage.id} className={`stage-column ${draggedStageId === stage.id ? 'dragging' : ''}`} onDragOver={handleDragOverStage} onDrop={(e) => handleDropStage(e, stage.id)}>
                           <div className="stage-header" draggable="true" onDragStart={(e) => handleDragStartStage(e, stage.id)} style={{ borderTop: `4px solid ${stage.color || '#3b82f6'}` }}>
@@ -662,7 +775,13 @@ function App() {
                                 </button>
                               )}
                             </div>
-                            <div className="stage-stats">{stageTasks.length} задач</div>
+                            <div className="stage-stats">
+                              <span>{stageTasks.length} задач</span>
+                              <span>{stageProgress}%</span>
+                            </div>
+                            <div className="stage-progress-track">
+                              <div className="stage-progress-fill" style={{ width: `${stageProgress}%`, backgroundColor: stage.color || '#3b82f6' }}></div>
+                            </div>
                           </div>
                           <div className="task-list">
                             {stageTasks.map(task => {
@@ -747,7 +866,7 @@ function App() {
                 )}
                 {activeProjectView === 'gantt' && (
                   <GanttChart 
-                    tasks={tasks.filter(t => projectStages.some(s => s.id === t.stage_id))} 
+                    tasks={projectTasks} 
                     stages={projectStages} 
                     onSelectTask={(task) => handleSelectTask(task)} 
                   />
