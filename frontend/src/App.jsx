@@ -241,6 +241,41 @@ function App() {
     }
   };
 
+  const handleDeleteStage = async (stage) => {
+    if (currentUser?.role !== 'Администратор') return;
+    const stageTasks = tasks.filter(t => t.stage_id === stage.id);
+    const taskText = stageTasks.length ? ` и ${stageTasks.length} задач внутри` : '';
+    if (!window.confirm(`Удалить этап "${stage.name}"${taskText}?`)) return;
+
+    const { error } = await supabase.from('stages').delete().eq('id', stage.id);
+    if (error) {
+      alert('Ошибка удаления этапа: ' + error.message);
+      return;
+    }
+
+    setStages(stages.filter(s => s.id !== stage.id));
+    setTasks(tasks.filter(t => t.stage_id !== stage.id));
+    if (selectedTask && selectedTask.stage_id === stage.id) {
+      setSelectedTaskId(null);
+    }
+  };
+
+  const handleDeleteTask = async (task) => {
+    if (currentUser?.role !== 'Администратор') return;
+    if (!window.confirm(`Удалить задачу "${task.name}"?`)) return;
+
+    const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+    if (error) {
+      alert('Ошибка удаления задачи: ' + error.message);
+      return;
+    }
+
+    setTasks(tasks.filter(t => t.id !== task.id));
+    if (selectedTaskId === task.id) {
+      setSelectedTaskId(null);
+    }
+  };
+
   const handleCreateTask = async (stageId) => {
     const newTask = { stage_id: stageId, name: 'Новая задача', status: 'planned', assignee_id: currentUser.id, checklist: [], attachments: [], feed: [], is_modified: false };
     const { data, error } = await supabase.from('tasks').insert([newTask]).select();
@@ -594,6 +629,17 @@ function App() {
                             <div className="stage-title" style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
                               <input type="color" value={stage.color || '#3b82f6'} onChange={(e) => handleStageColorChange(stage.id, e.target.value)} style={{width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer'}} title="Выбрать цвет этапа" />
                               <input type="text" value={stage.name} onChange={(e) => handleRenameStage(stage.id, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', outline: 'none' }} />
+                              {currentUser?.role === 'Администратор' && (
+                                <button className="btn btn-icon danger" title="Удалить этап" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleDeleteStage(stage); }}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M3 6h18" />
+                                    <path d="M8 6V4h8v2" />
+                                    <path d="M19 6l-1 14H6L5 6" />
+                                    <path d="M10 11v5" />
+                                    <path d="M14 11v5" />
+                                  </svg>
+                                </button>
+                              )}
                             </div>
                             <div className="stage-stats">{stageTasks.length} задач</div>
                           </div>
@@ -603,6 +649,17 @@ function App() {
                               return (
                                 <div key={task.id} className="task-card" data-status={task.status} onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}>
                                   {task.is_modified && <div className="modified-indicator"></div>}
+                                  {currentUser?.role === 'Администратор' && (
+                                    <button className="task-delete-btn" title="Удалить задачу" onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}>
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M3 6h18" />
+                                        <path d="M8 6V4h8v2" />
+                                        <path d="M19 6l-1 14H6L5 6" />
+                                        <path d="M10 11v5" />
+                                        <path d="M14 11v5" />
+                                      </svg>
+                                    </button>
+                                  )}
                                   <div className="task-title">{task.name}</div>
                                   <div className="task-meta">
                                     <span className={`status-badge ${task.status}`}>{statusLabels[task.status]}</span>
@@ -645,6 +702,10 @@ function App() {
                 users={users} 
                 stages={stages} 
                 onTaskUpdated={(updatedTask) => setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t))} 
+                onTaskDeleted={(deletedTaskId) => {
+                  setTasks(tasks.filter(t => t.id !== deletedTaskId));
+                  setSelectedTaskId(null);
+                }}
                 onDragStart={handlePanelDragStart}
               />
            </div>

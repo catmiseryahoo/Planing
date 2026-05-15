@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 
-export default function DatePicker({ value, onChange }) {
+export default function DatePicker({ value, onChange, popupAlign = 'left' }) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => {
     return value ? new Date(value + 'T00:00:00') : new Date();
@@ -105,11 +105,18 @@ export default function DatePicker({ value, onChange }) {
 
       {isOpen && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 200,
+          position: 'absolute',
+          top: '100%',
+          left: popupAlign === 'right' ? 'auto' : 0,
+          right: popupAlign === 'right' ? 0 : 'auto',
+          marginTop: '4px',
+          zIndex: 200,
           background: 'rgba(15, 23, 42, 0.97)', backdropFilter: 'blur(16px)',
           border: '1px solid rgba(255,255,255,0.15)', borderRadius: 'var(--radius-lg)',
           boxShadow: '0 20px 40px rgba(0,0,0,0.5)', padding: '1rem',
-          width: '320px', animation: 'fadeIn 0.15s ease'
+          width: 'min(320px, calc(100vw - 2rem))',
+          maxWidth: 'calc(100vw - 2rem)',
+          animation: 'fadeIn 0.15s ease'
         }}>
           {/* Header */}
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>

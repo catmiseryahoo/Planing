@@ -242,6 +242,13 @@ body {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
 }
+.btn-icon.danger {
+  color: var(--status-overdue-text);
+}
+.btn-icon.danger:hover {
+  background: var(--status-overdue);
+  color: #fecaca;
+}
 
 /* Project List Items */
 .project-list {
@@ -320,6 +327,31 @@ body {
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+}
+.task-delete-btn {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.75);
+  color: var(--status-overdue-text);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s, color 0.2s;
+  z-index: 2;
+}
+.task-card:hover .task-delete-btn {
+  opacity: 1;
+}
+.task-delete-btn:hover {
+  background: var(--status-overdue);
+  color: #fecaca;
 }
 .task-card:hover {
   transform: translateY(-2px);

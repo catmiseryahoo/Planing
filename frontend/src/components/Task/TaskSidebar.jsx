@@ -10,7 +10,7 @@ const statusLabels = {
   'overdue': 'Просрочено'
 };
 
-export default function TaskSidebar({ taskId, onClose, currentUser, users, stages, onTaskUpdated, onDragStart }) {
+export default function TaskSidebar({ taskId, onClose, currentUser, users, stages, onTaskUpdated, onTaskDeleted, onDragStart }) {
   const [task, setTask] = useState(null);
   const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
@@ -105,6 +105,20 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
   };
 
+  const handleDeleteTask = async () => {
+    if (!task || currentUser?.role !== 'Администратор') return;
+    if (!window.confirm(`Удалить задачу "${task.name}"?`)) return;
+
+    const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+    if (error) {
+      alert('Ошибка удаления задачи: ' + error.message);
+      return;
+    }
+
+    onTaskDeleted(task.id);
+    onClose();
+  };
+
   const handleAddComment = async () => {
     if (!commentText.trim() || !task) return;
     const newComment = { task_id: task.id, author_id: currentUser.id, text: commentText.trim() };
@@ -127,7 +141,20 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     <aside className="glass-panel sidebar-right" style={{ display: 'flex' }} onClick={(e) => e.stopPropagation()}>
       <div className="panel-header" onMouseDown={onDragStart} style={{cursor: 'move'}}>
         <h2>Свойства задачи</h2>
-        <button className="btn btn-icon" onClick={onClose}>✕</button>
+        <div style={{display: 'flex', alignItems: 'center', gap: '0.25rem'}} onMouseDown={(e) => e.stopPropagation()}>
+          {currentUser?.role === 'Администратор' && (
+            <button className="btn btn-icon danger" title="Удалить задачу" onClick={handleDeleteTask}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v5" />
+                <path d="M14 11v5" />
+              </svg>
+            </button>
+          )}
+          <button className="btn btn-icon" onClick={onClose}>✕</button>
+        </div>
       </div>
       
       <div className="panel-content" style={{paddingBottom: '2rem'}}>
@@ -149,7 +176,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
           </div>
           <div style={{flex: 1}}>
             <div className="detail-label">Срок</div>
-            <DatePicker value={editDate} onChange={(val) => setEditDate(val)} />
+            <DatePicker value={editDate} onChange={(val) => setEditDate(val)} popupAlign="right" />
           </div>
         </div>
 
