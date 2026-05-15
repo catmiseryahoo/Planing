@@ -132,7 +132,10 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     if (!error && data) {
       setSubtasks([...subtasks, data[0]]);
       onTaskUpdated(task, { subtask_count: subtasks.length + 1, is_modified: true }, {
-        changes: [{ label: 'Подзадача', from: 'Не было', to: data[0].title }]
+        action: 'add_subtask',
+        entityType: 'subtask',
+        entityId: data[0].id,
+        entityName: data[0].title
       });
       setNewSubtaskTitle('');
     }
@@ -148,7 +151,13 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     if (!error) {
       setSubtasks(subtasks.map(s => s.id === subtask.id ? { ...s, is_completed: newStatus } : s));
       onTaskUpdated(task, { is_modified: true }, {
-        changes: [{ label: `Подзадача "${subtask.title}"`, from: subtask.is_completed ? 'Готово' : 'Не готово', to: newStatus ? 'Готово' : 'Не готово' }]
+        action: 'update_subtask',
+        entityType: 'subtask',
+        entityId: subtask.id,
+        entityName: subtask.title,
+        details: {
+          changes: [{ label: 'Статус', from: subtask.is_completed ? 'Готово' : 'Не готово', to: newStatus ? 'Готово' : 'Не готово' }]
+        }
       });
     }
   };
@@ -163,7 +172,10 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     if (!error) {
       setSubtasks(subtasks.filter(s => s.id !== id));
       onTaskUpdated(task, { subtask_count: Math.max(0, subtasks.length - 1), is_modified: true }, {
-        changes: [{ label: 'Подзадача', from: removedSubtask?.title || 'Была', to: 'Удалена' }]
+        action: 'delete_subtask',
+        entityType: 'subtask',
+        entityId: id,
+        entityName: removedSubtask?.title || 'Подзадача'
       });
     }
   };
@@ -189,7 +201,10 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     if (!error && data) {
       setComments([...comments, data[0]]);
       onTaskUpdated(task, { comment_count: comments.length + 1, is_modified: true }, {
-        changes: [{ label: 'Комментарий', from: 'Не было', to: newComment.text }]
+        action: 'add_comment',
+        entityType: 'comment',
+        entityId: data[0].id,
+        entityName: newComment.text
       });
       setCommentText('');
     }

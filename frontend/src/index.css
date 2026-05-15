@@ -1152,6 +1152,9 @@ body {
   align-items: baseline;
   min-width: 0;
 }
+.project-log-change.compact {
+  grid-template-columns: minmax(110px, 160px) minmax(120px, 1fr);
+}
 .project-log-change-label {
   color: var(--text-primary);
   font-weight: 700;

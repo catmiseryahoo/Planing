@@ -54,6 +54,10 @@ const logActionLabels = {
   create_task: 'создал задачу',
   update_task: 'изменил задачу',
   delete_task: 'удалил задачу',
+  add_subtask: 'добавил подзадачу',
+  update_subtask: 'изменил подзадачу',
+  delete_subtask: 'удалил подзадачу',
+  add_comment: 'добавил комментарий',
   upload_file: 'добавил файл',
   delete_file: 'удалил файл',
   add_member: 'добавил сотрудника',
@@ -1173,14 +1177,24 @@ function App() {
                               <div className="project-log-details">
                                 {Array.isArray(log.details.changes) && log.details.changes.length > 0 ? (
                                   <div className="project-log-change-list">
-                                    {log.details.changes.map((change, index) => (
-                                      <div key={`${change.field || change.label}-${index}`} className="project-log-change">
-                                        <span className="project-log-change-label">{change.label || change.field}</span>
-                                        <span className="project-log-old">{String(change.from ?? 'Пусто')}</span>
-                                        <span className="project-log-arrow">→</span>
-                                        <span className="project-log-new">{String(change.to ?? 'Пусто')}</span>
-                                      </div>
-                                    ))}
+                                    {log.details.changes.map((change, index) => {
+                                      const hasFrom = change.from !== undefined && change.from !== null && change.from !== '' && change.from !== 'Не было';
+                                      const hasTo = change.to !== undefined && change.to !== null && change.to !== '';
+                                      return (
+                                        <div key={`${change.field || change.label}-${index}`} className={`project-log-change ${hasFrom && hasTo ? '' : 'compact'}`}>
+                                          <span className="project-log-change-label">{change.label || change.field}</span>
+                                          {hasFrom && hasTo ? (
+                                            <>
+                                              <span className="project-log-old">{String(change.from)}</span>
+                                              <span className="project-log-arrow">→</span>
+                                              <span className="project-log-new">{String(change.to)}</span>
+                                            </>
+                                          ) : (
+                                            <span className="project-log-new">{String(change.to ?? change.from ?? '')}</span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 ) : (
                                   <>
@@ -1218,13 +1232,14 @@ function App() {
                   setTasks(tasks.map(t => t.id === updatedTask.id ? { ...t, ...updatedTask, ...indicatorPatch } : t));
                   if (logDetails) {
                     const stage = stages.find(s => s.id === updatedTask.stage_id);
+                    const { action, entityType, entityId, entityName, details, ...restDetails } = logDetails;
                     appendProjectLog({
                       projectId: stage?.project_id,
-                      action: 'update_task',
-                      entityType: 'task',
-                      entityId: updatedTask.id,
-                      entityName: updatedTask.name,
-                      details: logDetails
+                      action: action || 'update_task',
+                      entityType: entityType || 'task',
+                      entityId: entityId || updatedTask.id,
+                      entityName: entityName || updatedTask.name,
+                      details: details || (Object.keys(restDetails).length > 0 ? restDetails : {})
                     });
                   }
                 }} 
@@ -1234,8 +1249,7 @@ function App() {
                     action: 'upload_file',
                     entityType: 'file',
                     entityId: file.id,
-                    entityName: file.file_name,
-                    details: { fileName: file.file_name }
+                    entityName: file.file_name
                   });
                 }}
                 onTaskFileDeleted={(fileId) => {
@@ -1245,8 +1259,7 @@ function App() {
                     action: 'delete_file',
                     entityType: 'file',
                     entityId: fileId,
-                    entityName: file?.file_name,
-                    details: { fileName: file?.file_name }
+                    entityName: file?.file_name
                   });
                 }}
                 onTaskDeleted={(deletedTaskId) => {
