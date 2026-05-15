@@ -132,6 +132,64 @@ const getProjectMetrics = (projectStages, projectTasks) => {
   };
 };
 
+const ProjectMemberIcon = ({ type }) => {
+  const commonProps = {
+    width: 22,
+    height: 22,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round'
+  };
+
+  if (type === 'mail') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="m3 7 9 6 9-6" />
+      </svg>
+    );
+  }
+
+  if (type === 'phone') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.2 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.6 2.61a2 2 0 0 1-.45 2.11L8 9.7a16 16 0 0 0 6.3 6.3l1.26-1.26a2 2 0 0 1 2.11-.45c.84.28 1.71.48 2.61.6A2 2 0 0 1 22 16.92Z" />
+      </svg>
+    );
+  }
+
+  if (type === 'telegram') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M21.7 4.3c.3-1-.6-1.8-1.5-1.4L2.9 9.6c-1.2.5-1.2 2.1.1 2.5l4.4 1.4 1.7 5.2c.4 1.1 1.8 1.3 2.4.4l2.4-3.4 4.6 3.3c.9.6 2.1.1 2.3-1l2.9-13.7Zm-4.1 2.4-8.2 7.2-.3 3.2-1.1-3.5 9.6-6.9Z" />
+      </svg>
+    );
+  }
+
+  if (type === 'role') {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3v8Z" />
+        <path d="M9 12l2 2 4-5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...commonProps} aria-hidden="true">
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M9 16h.01" />
+      <path d="M13 16h.01" />
+    </svg>
+  );
+};
+
 function App() {
   const [session, setSession] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -1137,6 +1195,8 @@ function App() {
                           return dueDate && dueDate < today && task.status !== 'done';
                         }).length;
                         const donePercent = assignedCount > 0 ? Math.round((completedCount / assignedCount) * 100) : 0;
+                        const activePercent = assignedCount > 0 ? Math.round((activeCount / assignedCount) * 100) : 0;
+                        const overduePercent = assignedCount > 0 ? Math.round((overdueCount / assignedCount) * 100) : 0;
                         const workloadPercent = Math.min(100, Math.round((activeCount / 8) * 100));
                         const workloadLabel = activeCount >= 8 ? 'Перегруз' : activeCount >= 5 ? 'Высокая' : activeCount >= 2 ? 'Нормальная' : 'Свободен';
                         const nextTask = assignedTasks
@@ -1150,6 +1210,9 @@ function App() {
                               ) : (
                                 <div className="project-member-photo-fallback" style={{backgroundColor: user?.avatar_color || '#3b82f6'}}>{getUserInitials(user?.name || user?.email)}</div>
                               )}
+                              {canManageProjectMembers && (
+                                <button className="project-member-remove" title="Удалить из проекта" onClick={() => handleDeleteProjectMember(member)}>✕</button>
+                              )}
                             </div>
                             <div className="project-member-card-body">
                               <div className="project-member-card-head">
@@ -1157,33 +1220,51 @@ function App() {
                                   <div className="project-member-name">{user?.name || user?.email || 'Сотрудник'}</div>
                                   <div className="project-member-role">{member.role}</div>
                                 </div>
-                                {canManageProjectMembers && (
-                                  <button className="btn btn-icon danger" title="Удалить из проекта" onClick={() => handleDeleteProjectMember(member)}>✕</button>
-                                )}
                               </div>
                               <div className="project-member-contact-list">
-                                <div className="project-member-contact">
-                                  <span>Email</span>
-                                  <strong>{user?.email || 'Не указан'}</strong>
+                                <div className="project-member-contact accent-blue">
+                                  <span className="project-member-contact-icon"><ProjectMemberIcon type="mail" /></span>
+                                  <div>
+                                    <span>Email</span>
+                                    <strong>{user?.email || 'Не указан'}</strong>
+                                  </div>
                                 </div>
-                                <div className="project-member-contact">
-                                  <span>Телефон</span>
-                                  <strong>{user?.phone || 'Не указан'}</strong>
+                                <div className="project-member-contact accent-pink">
+                                  <span className="project-member-contact-icon"><ProjectMemberIcon type="phone" /></span>
+                                  <div>
+                                    <span>Телефон</span>
+                                    <strong>{user?.phone || 'Не указан'}</strong>
+                                  </div>
                                 </div>
-                                <div className="project-member-contact">
-                                  <span>Системная роль</span>
-                                  <strong>{user?.role || 'Сотрудник'}</strong>
+                                <div className="project-member-contact accent-cyan">
+                                  <span className="project-member-contact-icon"><ProjectMemberIcon type="telegram" /></span>
+                                  <div>
+                                    <span>Telegram</span>
+                                    <strong>{user?.telegram ? `@${String(user.telegram).replace(/^@/, '')}` : 'Не указан'}</strong>
+                                  </div>
                                 </div>
-                                <div className="project-member-contact">
-                                  <span>Ближайший срок</span>
-                                  <strong>{nextTask ? formatDate(nextTask.date || nextTask.due_date) : 'Нет активных сроков'}</strong>
+                                <div className="project-member-contact accent-orange">
+                                  <span className="project-member-contact-icon"><ProjectMemberIcon type="role" /></span>
+                                  <div>
+                                    <span>Системная роль</span>
+                                    <strong>{user?.role || 'Сотрудник'}</strong>
+                                  </div>
+                                  <em>В проекте</em>
+                                </div>
+                                <div className="project-member-contact accent-green">
+                                  <span className="project-member-contact-icon"><ProjectMemberIcon type="date" /></span>
+                                  <div>
+                                    <span>Ближайший срок</span>
+                                    <strong>{nextTask ? formatDate(nextTask.date || nextTask.due_date) : 'Нет активных сроков'}</strong>
+                                  </div>
                                 </div>
                               </div>
+                              <div className="project-member-section-title">Статистика</div>
                               <div className="project-member-stats">
-                                <div><strong>{assignedCount}</strong><span>всего</span></div>
-                                <div><strong>{activeCount}</strong><span>активно</span></div>
-                                <div><strong>{completedCount}</strong><span>готово</span></div>
-                                <div className={overdueCount > 0 ? 'danger' : ''}><strong>{overdueCount}</strong><span>просрочено</span></div>
+                                <div style={{ '--stat-progress': `${assignedCount > 0 ? 100 : 0}%` }}><strong>{assignedCount}</strong><span>всего</span><i>{assignedCount > 0 ? 100 : 0}%</i></div>
+                                <div style={{ '--stat-progress': `${activePercent}%` }}><strong>{activeCount}</strong><span>активно</span><i>{activePercent}%</i></div>
+                                <div style={{ '--stat-progress': `${donePercent}%` }}><strong>{completedCount}</strong><span>готово</span><i>{donePercent}%</i></div>
+                                <div className={overdueCount > 0 ? 'danger' : ''} style={{ '--stat-progress': `${overduePercent}%` }}><strong>{overdueCount}</strong><span>просрочено</span><i>{overduePercent}%</i></div>
                               </div>
                               <div className="project-member-load">
                                 <div className="project-member-load-row">

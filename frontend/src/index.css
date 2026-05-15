@@ -739,7 +739,7 @@ body {
   border-radius: var(--radius-md);
   font-family: inherit;
   font-size: 0.875rem;
-  background: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
   margin-bottom: 0.5rem;
   display: flex;
@@ -748,21 +748,32 @@ body {
   transition: all 0.2s;
   cursor: pointer;
 }
+select.edit-select {
+  appearance: none;
+  padding-right: 2.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.95rem center;
+  background-size: 18px 18px;
+}
 .edit-select.compact {
   width: 220px;
   margin-bottom: 0;
 }
 
 .edit-select:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .edit-select:focus {
   outline: none;
-  background: var(--card-bg);
+  background-color: var(--card-bg);
   border-color: var(--accent-color);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
   cursor: text;
+}
+select.edit-select:focus {
+  cursor: pointer;
 }
 
 
@@ -1076,7 +1087,7 @@ body {
 }
 .project-member-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 360px));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 400px));
   gap: 1rem;
   align-items: start;
 }
@@ -1088,17 +1099,29 @@ body {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--panel-border);
+  border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(180deg, rgba(31, 41, 59, 0.72), rgba(13, 19, 33, 0.9)),
+    rgba(21, 27, 41, 0.94);
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .project-member-photo {
-  height: 180px;
+  position: relative;
+  height: 240px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.06);
+}
+.project-member-photo::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 42%;
+  background: linear-gradient(to top, rgba(13, 19, 33, 0.52), transparent);
+  pointer-events: none;
 }
 .project-member-photo img,
 .project-member-photo-fallback {
@@ -1114,11 +1137,32 @@ body {
   font-size: 3rem;
   font-weight: 900;
 }
+.project-member-remove {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 14, 28, 0.54);
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+.project-member-remove:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.44);
+  color: #fecaca;
+}
 .project-member-card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  padding: 1rem;
+  gap: 1rem;
+  padding: 1.15rem;
 }
 .project-member-card-head {
   display: flex;
@@ -1128,8 +1172,9 @@ body {
 }
 .project-member-name {
   color: var(--text-primary);
-  font-size: 1.08rem;
-  font-weight: 700;
+  font-size: 1.45rem;
+  line-height: 1.25;
+  font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1140,57 +1185,196 @@ body {
 }
 .project-member-contact-list {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.85rem;
 }
 .project-member-contact {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: 0.5rem;
-  align-items: baseline;
-  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+  min-height: 74px;
+  padding: 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.018));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 24px rgba(0, 0, 0, 0.12);
+  font-size: 0.88rem;
+}
+.project-member-contact > div {
+  min-width: 0;
+  flex: 1;
 }
 .project-member-contact span {
+  display: block;
   color: var(--text-secondary);
+  font-weight: 700;
 }
 .project-member-contact strong {
+  display: block;
+  margin-top: 0.2rem;
   min-width: 0;
   color: var(--text-primary);
-  font-weight: 600;
+  font-size: 1.04rem;
+  font-weight: 700;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.project-member-contact em {
+  flex-shrink: 0;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(174, 198, 255, 0.16);
+  color: #c7d2fe;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 800;
+}
+.project-member-contact-icon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #dbeafe !important;
+  background: rgba(99, 102, 241, 0.2);
+}
+.project-member-contact-icon svg {
+  width: 21px;
+  height: 21px;
+}
+.project-member-contact.accent-blue .project-member-contact-icon {
+  color: #c7d2fe !important;
+  background: rgba(99, 102, 241, 0.22);
+}
+.project-member-contact.accent-pink .project-member-contact-icon {
+  color: #f5c2ff !important;
+  background: rgba(217, 70, 239, 0.2);
+}
+.project-member-contact.accent-cyan .project-member-contact-icon {
+  color: #7dd3fc !important;
+  background: rgba(14, 165, 233, 0.18);
+}
+.project-member-contact.accent-orange .project-member-contact-icon {
+  color: #fed7aa !important;
+  background: rgba(249, 115, 22, 0.18);
+}
+.project-member-contact.accent-green .project-member-contact-icon {
+  color: #bbf7d0 !important;
+  background: rgba(34, 197, 94, 0.16);
+}
+.project-member-section-title {
+  margin-top: 0.15rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .project-member-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.45rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
 }
 .project-member-stats div {
+  position: relative;
   min-width: 0;
-  padding: 0.55rem 0.45rem;
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.035);
-  text-align: center;
+  min-height: 112px;
+  padding: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 12px 24px rgba(0, 0, 0, 0.13);
+  text-align: left;
+}
+.project-member-stats div::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, rgba(21, 27, 41, 0.92) 56%, transparent 57%),
+    conic-gradient(#c4b5fd var(--stat-progress, 0%), rgba(174, 198, 255, 0.08) 0);
+}
+.project-member-stats div::before {
+  content: none;
 }
 .project-member-stats strong,
-.project-member-stats span {
+.project-member-stats span,
+.project-member-stats i {
   display: block;
 }
 .project-member-stats strong {
-  color: var(--text-primary);
-  font-size: 1.05rem;
+  color: #c4b5fd;
+  font-size: 2.2rem;
+  line-height: 1;
 }
 .project-member-stats span {
+  margin-top: 1.2rem;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.project-member-stats i {
+  position: absolute;
+  right: 1rem;
+  top: 2.05rem;
+  z-index: 1;
+  width: 52px;
   color: var(--text-secondary);
   font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 900;
+  text-align: center;
+}
+.project-member-stats div:nth-child(2) strong {
+  color: #e9a8ff;
+}
+.project-member-stats div:nth-child(2)::after {
+  background:
+    radial-gradient(circle at center, rgba(21, 27, 41, 0.92) 56%, transparent 57%),
+    conic-gradient(#e9a8ff var(--stat-progress, 0%), rgba(233, 168, 255, 0.08) 0);
+}
+.project-member-stats div:nth-child(3) strong {
+  color: #94a3b8;
+}
+.project-member-stats div:nth-child(3)::after {
+  background:
+    radial-gradient(circle at center, rgba(21, 27, 41, 0.92) 56%, transparent 57%),
+    conic-gradient(#94a3b8 var(--stat-progress, 0%), rgba(148, 163, 184, 0.08) 0);
+}
+.project-member-stats div:nth-child(4) strong {
+  color: #c58f8f;
+}
+.project-member-stats div:nth-child(4)::after {
+  background:
+    radial-gradient(circle at center, rgba(21, 27, 41, 0.92) 56%, transparent 57%),
+    conic-gradient(#c58f8f var(--stat-progress, 0%), rgba(197, 143, 143, 0.08) 0);
 }
 .project-member-stats .danger strong {
   color: var(--danger);
 }
+.project-member-stats .danger::after {
+  background:
+    radial-gradient(circle at center, rgba(21, 27, 41, 0.92) 56%, transparent 57%),
+    conic-gradient(var(--danger) var(--stat-progress, 0%), rgba(239, 68, 68, 0.08) 0);
+}
 .project-member-load {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.7rem;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 12px 26px rgba(0, 0, 0, 0.12);
 }
 .project-member-load-row {
   display: flex;
@@ -1205,19 +1389,19 @@ body {
   font-weight: 700;
 }
 .project-member-progress {
-  height: 7px;
+  height: 10px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(148, 163, 184, 0.18);
 }
 .project-member-progress span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
+  background: #c4b5fd;
 }
 .project-member-progress.workload span {
-  background: #22c55e;
+  background: linear-gradient(90deg, #e9a8ff, #ffb77e);
 }
 .project-member-progress.workload.warning span {
   background: #f59e0b;
@@ -1227,7 +1411,13 @@ body {
 }
 .project-member-card-actions .edit-select {
   width: 100%;
+  height: 52px;
+  padding-left: 1rem;
   margin-bottom: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background-color: rgba(255, 255, 255, 0.06);
+  font-size: 0.95rem;
 }
 .project-member-role-static {
   color: var(--text-secondary);
