@@ -5,9 +5,14 @@
   height: 100%;
   background: rgba(255, 255, 255, 0.02);
   border-radius: var(--radius-lg);
-  overflow-x: auto;
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid var(--panel-border);
+}
+
+.gantt-scroll {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
 }
 
 .gantt-header {
@@ -37,8 +42,8 @@
 }
 
 .gantt-day-tick {
-  width: 40px;
-  min-width: 40px;
+  width: var(--gantt-day-width, 40px);
+  min-width: var(--gantt-day-width, 40px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -113,7 +118,7 @@
   flex: 1;
   min-height: 40px;
   background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 40px 100%;
+  background-size: var(--gantt-day-width, 40px) 100%;
 }
 
 .gantt-bar {

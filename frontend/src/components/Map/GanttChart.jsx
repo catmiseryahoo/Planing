@@ -1,9 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import './GanttChart.css';
 
 export default function GanttChart({ tasks, stages, onSelectTask }) {
+  const [dayWidth, setDayWidth] = useState(40);
+  const containerRef = useRef(null);
+
   // Вычисляем границы дат для отображения
-  const { minDate, maxDate, days } = useMemo(() => {
+  const { minDate, days } = useMemo(() => {
     let min = new Date();
     let max = new Date();
     max.setDate(max.getDate() + 30); // По умолчанию показываем 30 дней вперед
@@ -33,8 +36,30 @@ export default function GanttChart({ tasks, stages, onSelectTask }) {
       dArray.push(d);
     }
 
-    return { minDate: min, maxDate: max, days: dArray };
+    return { minDate: min, days: dArray };
   }, [tasks]);
+
+  const handleWheel = (e) => {
+    if (!e.altKey) return;
+    e.preventDefault();
+
+    const container = containerRef.current;
+    const rect = container?.getBoundingClientRect();
+    const pointerX = rect ? e.clientX - rect.left : 0;
+    const oldWidth = dayWidth;
+    const delta = e.deltaY || e.deltaX;
+    const nextWidth = Math.min(96, Math.max(18, oldWidth + (delta < 0 ? 4 : -4)));
+    if (nextWidth === oldWidth) return;
+
+    setDayWidth(nextWidth);
+
+    if (container) {
+      const scale = nextWidth / oldWidth;
+      requestAnimationFrame(() => {
+        container.scrollLeft = (container.scrollLeft + pointerX) * scale - pointerX;
+      });
+    }
+  };
 
   const getTaskStyle = (task) => {
     const start = task.start_date ? new Date(task.start_date) : new Date();
@@ -49,8 +74,8 @@ export default function GanttChart({ tasks, stages, onSelectTask }) {
     const barColor = stage?.color || getStatusColor(task.status);
 
     return {
-      left: `${startOffset * 40}px`,
-      width: `${duration * 40}px`,
+      left: `${startOffset * dayWidth}px`,
+      width: `${duration * dayWidth}px`,
       backgroundColor: barColor
     };
   };
@@ -67,6 +92,12 @@ export default function GanttChart({ tasks, stages, onSelectTask }) {
 
   return (
     <div className="gantt-container">
+      <div
+        ref={containerRef}
+        className="gantt-scroll"
+        onWheel={handleWheel}
+        style={{ '--gantt-day-width': `${dayWidth}px` }}
+      >
       <div className="gantt-header">
         <div className="gantt-row-title-header">Задачи</div>
         <div className="gantt-timeline-header">
@@ -103,6 +134,7 @@ export default function GanttChart({ tasks, stages, onSelectTask }) {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import DatePicker from '../UI/DatePicker';
 
+const TASK_FILE_BUCKET = 'task-files';
+
 const statusLabels = {
   'planned': 'План',
   'in-progress': 'В работе',
@@ -14,6 +16,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
   const [task, setTask] = useState(null);
   const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
+  const [files, setFiles] = useState([]);
   
   const [editName, setEditName] = useState('');
   const [editStatus, setEditStatus] = useState('');
@@ -24,6 +27,9 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [commentText, setCommentText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [isDragOverFiles, setIsDragOverFiles] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (taskId) {
@@ -33,10 +39,11 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
 
   const loadTaskData = async (id) => {
     setIsLoading(true);
-    const [taskRes, subtasksRes, commentsRes] = await Promise.all([
+    const [taskRes, subtasksRes, commentsRes, filesRes] = await Promise.all([
       supabase.from('tasks').select('*').eq('id', id).single(),
       supabase.from('subtasks').select('*').eq('task_id', id).order('created_at', { ascending: true }),
-      supabase.from('comments').select('*, author:profiles(*)').eq('task_id', id).order('created_at', { ascending: true })
+      supabase.from('comments').select('*, author:profiles(*)').eq('task_id', id).order('created_at', { ascending: true }),
+      supabase.from('task_files').select('*').eq('task_id', id).order('created_at', { ascending: true })
     ]);
 
     if (taskRes.data) {
@@ -49,6 +56,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
     if (subtasksRes.data) setSubtasks(subtasksRes.data);
     if (commentsRes.data) setComments(commentsRes.data);
+    if (filesRes.data) setFiles(filesRes.data);
     
     setIsLoading(false);
   };
@@ -84,6 +92,10 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     if (!newSubtaskTitle.trim() || !task) return;
     const newSubtask = { task_id: task.id, title: newSubtaskTitle.trim(), is_completed: false };
     const { data, error } = await supabase.from('subtasks').insert([newSubtask]).select();
+    if (error) {
+      alert('Ошибка добавления подзадачи: ' + error.message);
+      return;
+    }
     if (!error && data) {
       setSubtasks([...subtasks, data[0]]);
       setNewSubtaskTitle('');
@@ -93,6 +105,10 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
   const handleToggleSubtask = async (subtask) => {
     const newStatus = !subtask.is_completed;
     const { error } = await supabase.from('subtasks').update({ is_completed: newStatus }).eq('id', subtask.id);
+    if (error) {
+      alert('Ошибка обновления подзадачи: ' + error.message);
+      return;
+    }
     if (!error) {
       setSubtasks(subtasks.map(s => s.id === subtask.id ? { ...s, is_completed: newStatus } : s));
     }
@@ -100,6 +116,10 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
 
   const handleDeleteSubtask = async (id) => {
     const { error } = await supabase.from('subtasks').delete().eq('id', id);
+    if (error) {
+      alert('Ошибка удаления подзадачи: ' + error.message);
+      return;
+    }
     if (!error) {
       setSubtasks(subtasks.filter(s => s.id !== id));
     }
@@ -129,6 +149,76 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
   };
 
+  const handleUploadFiles = async (fileList) => {
+    if (!task || !fileList?.length) return;
+    setIsUploadingFiles(true);
+
+    try {
+      for (const file of Array.from(fileList)) {
+        const safeName = file.name.replace(/[^\w.\-а-яА-ЯёЁ ]/g, '_');
+        const filePath = `${task.id}/${crypto.randomUUID()}-${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from(TASK_FILE_BUCKET)
+          .upload(filePath, file, { upsert: false });
+
+        if (uploadError) {
+          throw new Error(uploadError.message);
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from(TASK_FILE_BUCKET)
+          .getPublicUrl(filePath);
+
+        const { data, error: insertError } = await supabase
+          .from('task_files')
+          .insert([{
+            task_id: task.id,
+            uploader_id: currentUser.id,
+            file_name: file.name,
+            file_url: publicUrlData.publicUrl,
+            file_size: file.size
+          }])
+          .select();
+
+        if (insertError) {
+          throw new Error(insertError.message);
+        }
+
+        if (data?.[0]) {
+          setFiles(currentFiles => [...currentFiles, data[0]]);
+        }
+      }
+    } catch (error) {
+      alert('Ошибка загрузки файла: ' + error.message + '. Проверьте bucket task-files и политики Storage.');
+    } finally {
+      setIsUploadingFiles(false);
+      setIsDragOverFiles(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteFile = async (file) => {
+    if (!window.confirm(`Удалить файл "${file.file_name}"?`)) return;
+
+    const { error } = await supabase.from('task_files').delete().eq('id', file.id);
+    if (error) {
+      alert('Ошибка удаления файла: ' + error.message);
+      return;
+    }
+
+    setFiles(files.filter(f => f.id !== file.id));
+  };
+
+  const formatFileSize = (size) => {
+    if (!size) return '';
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const isImageFile = (file) => {
+    return /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(file.file_name || file.file_url || '');
+  };
+
   if (isLoading) {
     return (
       <aside className="glass-panel sidebar-right" style={{ display: 'flex', padding: '2rem' }}>
@@ -153,7 +243,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
               </svg>
             </button>
           )}
-          <button className="btn btn-icon" onClick={onClose}>✕</button>
+          <button className="btn btn-icon close-panel-btn" onClick={onClose}>✕</button>
         </div>
       </div>
       
@@ -193,6 +283,48 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
         <div className="detail-section">
           <div className="detail-label">Описание</div>
           <textarea className="edit-textarea" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Добавьте описание задачи..." />
+        </div>
+
+        <div className="detail-section" style={{marginTop: '2rem'}}>
+          <div className="detail-label" style={{borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.5rem', marginBottom: '1rem'}}>
+            Файлы и медиа
+          </div>
+          <div
+            className={`file-drop-zone ${isDragOverFiles ? 'dragover' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); setIsDragOverFiles(true); }}
+            onDragLeave={() => setIsDragOverFiles(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleUploadFiles(e.dataTransfer.files);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={(e) => handleUploadFiles(e.target.files)}
+              style={{display: 'none'}}
+            />
+            {isUploadingFiles ? 'Загрузка...' : 'Перетащите файлы сюда или нажмите для выбора'}
+          </div>
+          <div className="task-file-list">
+            {files.map(file => (
+              <div key={file.id} className="task-file-item">
+                {isImageFile(file) && (
+                  <a href={file.file_url} target="_blank" rel="noreferrer" className="task-file-preview">
+                    <img src={file.file_url} alt={file.file_name} />
+                  </a>
+                )}
+                <div className="task-file-info">
+                  <a href={file.file_url} target="_blank" rel="noreferrer" className="task-file-name">{file.file_name}</a>
+                  <span className="task-file-size">{formatFileSize(file.file_size)}</span>
+                </div>
+                <button className="btn btn-icon danger" title="Удалить файл" onClick={() => handleDeleteFile(file)}>✕</button>
+              </div>
+            ))}
+            {files.length === 0 && <div style={{color: 'var(--text-secondary)', fontSize: '0.85rem'}}>Нет файлов</div>}
+          </div>
         </div>
 
         {/* НОВЫЙ БЛОК: Подзадачи */}
