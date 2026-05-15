@@ -448,7 +448,7 @@ function App() {
         entityType: 'member',
         entityId: member.id,
         entityName: user?.name || user?.email,
-        details: { role }
+        details: { changes: [{ field: 'role', label: 'Роль', from: member.role || 'Участник', to: role }] }
       });
     }
   };
@@ -576,7 +576,7 @@ function App() {
         entityType: 'stage',
         entityId: id,
         entityName: newName,
-        details: { field: 'name', from: oldStage.name, to: newName }
+        details: { changes: [{ field: 'name', label: 'Название этапа', from: oldStage.name, to: newName }] }
       });
     }
   };
@@ -592,7 +592,7 @@ function App() {
         entityType: 'stage',
         entityId: id,
         entityName: oldStage.name,
-        details: { field: 'color', from: oldStage.color, to: newColor }
+        details: { changes: [{ field: 'color', label: 'Цвет этапа', from: oldStage.color || 'Не задан', to: newColor }] }
       });
     }
   };
@@ -1171,11 +1171,26 @@ function App() {
                             </div>
                             {log.details && Object.keys(log.details).length > 0 && (
                               <div className="project-log-details">
-                                {log.details.field && <>Поле: {log.details.field}. </>}
-                                {log.details.from && <>Было: {String(log.details.from)}. </>}
-                                {log.details.to && <>Стало: {String(log.details.to)}.</>}
-                                {log.details.role && <>Роль: {log.details.role}</>}
-                                {log.details.fileName && <>Файл: {log.details.fileName}</>}
+                                {Array.isArray(log.details.changes) && log.details.changes.length > 0 ? (
+                                  <div className="project-log-change-list">
+                                    {log.details.changes.map((change, index) => (
+                                      <div key={`${change.field || change.label}-${index}`} className="project-log-change">
+                                        <span className="project-log-change-label">{change.label || change.field}</span>
+                                        <span className="project-log-old">{String(change.from ?? 'Пусто')}</span>
+                                        <span className="project-log-arrow">→</span>
+                                        <span className="project-log-new">{String(change.to ?? 'Пусто')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <>
+                                    {log.details.field && <>Поле: {log.details.field}. </>}
+                                    {log.details.from && <>Было: {String(log.details.from)}. </>}
+                                    {log.details.to && <>Стало: {String(log.details.to)}.</>}
+                                    {log.details.role && <>Роль: {log.details.role}</>}
+                                    {log.details.fileName && <>Файл: {log.details.fileName}</>}
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>

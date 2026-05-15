@@ -61,16 +61,43 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     setIsLoading(false);
   };
 
+  const getUserName = (userId) => {
+    if (!userId) return 'Не назначен';
+    const user = users.find(item => item.id === userId);
+    return user?.name || user?.email || 'Не назначен';
+  };
+
+  const buildTaskChanges = (updates) => {
+    const fields = [
+      { key: 'name', label: 'Название', before: task.name || '', after: updates.name || '' },
+      { key: 'status', label: 'Статус', before: task.status || 'planned', after: updates.status || 'planned', format: value => statusLabels[value] || value },
+      { key: 'assignee_id', label: 'Ответственный', before: task.assignee_id || '', after: updates.assignee_id || '', format: getUserName },
+      { key: 'date', label: 'Срок', before: task.date || '', after: updates.date || '', format: value => value || 'Не задан' },
+      { key: 'desc', label: 'Описание', before: task.desc || '', after: updates.desc || '', format: value => value || 'Пусто' }
+    ];
+
+    return fields
+      .filter(field => String(field.before ?? '') !== String(field.after ?? ''))
+      .map(field => ({
+        field: field.key,
+        label: field.label,
+        from: field.format ? field.format(field.before) : field.before,
+        to: field.format ? field.format(field.after) : field.after
+      }));
+  };
+
   const handleUpdateTask = async () => {
     if (!task) return;
+    const hasPendingComment = Boolean(commentText.trim());
+    const hasPendingSubtask = Boolean(newSubtaskTitle.trim());
     
     // Сохраняем не отправленный комментарий, если он есть
-    if (commentText.trim()) {
+    if (hasPendingComment) {
       await handleAddComment();
     }
     
     // Сохраняем не добавленную подзадачу, если она есть
-    if (newSubtaskTitle.trim()) {
+    if (hasPendingSubtask) {
       await handleAddSubtask();
     }
 
@@ -81,16 +108,15 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
       date: editDate || null, 
       desc: editDesc 
     };
+    const changes = buildTaskChanges(updates);
     const { data, error } = await supabase.from('tasks').update(updates).eq('id', task.id).select();
     if (!error && data) {
       onTaskUpdated(data[0], {
-        subtask_count: subtasks.length + (newSubtaskTitle.trim() ? 1 : 0),
-        comment_count: comments.length + (commentText.trim() ? 1 : 0),
+        subtask_count: subtasks.length + (hasPendingSubtask ? 1 : 0),
+        comment_count: comments.length + (hasPendingComment ? 1 : 0),
         file_count: files.length,
         is_modified: true
-      }, {
-        changedFields: ['name', 'status', 'assignee_id', 'date', 'desc'].filter(field => updates[field] !== task[field])
-      });
+      }, changes.length > 0 ? { changes } : null);
       onClose(); // Закрываем панель после сохранения
     }
   };
@@ -105,7 +131,9 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
     if (!error && data) {
       setSubtasks([...subtasks, data[0]]);
-      onTaskUpdated(task, { subtask_count: subtasks.length + 1 });
+      onTaskUpdated(task, { subtask_count: subtasks.length + 1, is_modified: true }, {
+        changes: [{ label: 'Подзадача', from: 'Не было', to: data[0].title }]
+      });
       setNewSubtaskTitle('');
     }
   };
@@ -119,10 +147,14 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
     if (!error) {
       setSubtasks(subtasks.map(s => s.id === subtask.id ? { ...s, is_completed: newStatus } : s));
+      onTaskUpdated(task, { is_modified: true }, {
+        changes: [{ label: `Подзадача "${subtask.title}"`, from: subtask.is_completed ? 'Готово' : 'Не готово', to: newStatus ? 'Готово' : 'Не готово' }]
+      });
     }
   };
 
   const handleDeleteSubtask = async (id) => {
+    const removedSubtask = subtasks.find(subtask => subtask.id === id);
     const { error } = await supabase.from('subtasks').delete().eq('id', id);
     if (error) {
       alert('Ошибка удаления подзадачи: ' + error.message);
@@ -130,7 +162,9 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
     if (!error) {
       setSubtasks(subtasks.filter(s => s.id !== id));
-      onTaskUpdated(task, { subtask_count: Math.max(0, subtasks.length - 1) });
+      onTaskUpdated(task, { subtask_count: Math.max(0, subtasks.length - 1), is_modified: true }, {
+        changes: [{ label: 'Подзадача', from: removedSubtask?.title || 'Была', to: 'Удалена' }]
+      });
     }
   };
 
@@ -154,6 +188,9 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     const { data, error } = await supabase.from('comments').insert([newComment]).select('*, author:profiles(*)');
     if (!error && data) {
       setComments([...comments, data[0]]);
+      onTaskUpdated(task, { comment_count: comments.length + 1, is_modified: true }, {
+        changes: [{ label: 'Комментарий', from: 'Не было', to: newComment.text }]
+      });
       setCommentText('');
     }
   };
