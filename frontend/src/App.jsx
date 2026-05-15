@@ -41,6 +41,30 @@ const getCompletionPercent = (items) => {
   return Math.round((doneCount / items.length) * 100);
 };
 
+const formatFileSize = (size) => {
+  if (!size) return '';
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const logActionLabels = {
+  create_stage: 'создал этап',
+  update_stage: 'изменил этап',
+  delete_stage: 'удалил этап',
+  create_task: 'создал задачу',
+  update_task: 'изменил задачу',
+  delete_task: 'удалил задачу',
+  upload_file: 'добавил файл',
+  delete_file: 'удалил файл',
+  add_member: 'добавил сотрудника',
+  update_member: 'изменил роль сотрудника',
+  remove_member: 'удалил сотрудника'
+};
+
+const isImageFile = (file) => {
+  return /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(file?.file_name || file?.file_url || '');
+};
+
 const getProjectMetrics = (projectStages, projectTasks) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -112,6 +136,9 @@ function App() {
   const [stages, setStages] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
+  const [taskFiles, setTaskFiles] = useState([]);
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [projectLogs, setProjectLogs] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [isDataLoading, setIsDataLoading] = useState(false);
 
@@ -140,6 +167,8 @@ function App() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('Сотрудник');
+  const [memberUserId, setMemberUserId] = useState('');
+  const [memberRole, setMemberRole] = useState('Участник');
 
   const [adminEditingUser, setAdminEditingUser] = useState(null);
 
@@ -166,14 +195,16 @@ function App() {
   const fetchData = async () => {
     setIsDataLoading(true);
     try {
-      const [projectsRes, stagesRes, tasksRes, profilesRes, subtasksRes, commentsRes, filesRes] = await Promise.all([
+      const [projectsRes, stagesRes, tasksRes, profilesRes, subtasksRes, commentsRes, filesRes, membersRes, logsRes] = await Promise.all([
         supabase.from('projects').select('*').order('created_at', { ascending: true }),
         supabase.from('stages').select('*').order('order', { ascending: true }),
         supabase.from('tasks').select('*'),
         supabase.from('profiles').select('*'),
         supabase.from('subtasks').select('task_id'),
         supabase.from('comments').select('task_id'),
-        supabase.from('task_files').select('task_id')
+        supabase.from('task_files').select('*').order('created_at', { ascending: false }),
+        supabase.from('project_members').select('*'),
+        supabase.from('project_logs').select('*').order('created_at', { ascending: false }).limit(300)
       ]);
 
       const subtaskCounts = countByTaskId(subtasksRes.data);
@@ -190,6 +221,9 @@ function App() {
       setStages(stagesRes.data || []);
       setTasks(tasksWithIndicators);
       setUsers(profilesRes.data || []);
+      setTaskFiles(filesRes.data || []);
+      setProjectMembers(membersRes.data || []);
+      setProjectLogs(logsRes.data || []);
 
       if (projectsRes.data?.length > 0 && !activeProjectId) {
         setActiveProjectId(projectsRes.data[0].id);
@@ -277,9 +311,33 @@ function App() {
   const projectTasks = tasks.filter(t => projectStages.some(s => s.id === t.stage_id));
   const projectMetrics = getProjectMetrics(projectStages, projectTasks);
   const selectedTask = tasks.find(t => t.id === selectedTaskId);
+  const projectTaskIds = new Set(projectTasks.map(task => task.id));
+  const projectFiles = taskFiles.filter(file => projectTaskIds.has(file.task_id));
+  const activeProjectMembers = projectMembers.filter(member => member.project_id === activeProjectId);
+  const activeProjectLogs = projectLogs.filter(log => log.project_id === activeProjectId);
+  const isProjectLead = activeProjectMembers.some(member => member.user_id === currentUser.id && member.role === 'Руководитель проекта');
+  const canManageProjectMembers = currentUser.role === 'Администратор' || isProjectLead;
   
   const getUserInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '?';
   const getUser = (id) => users.find(u => u.id === id);
+
+  const appendProjectLog = async ({ projectId = activeProjectId, action, entityType, entityId, entityName, details = {} }) => {
+    if (!projectId || !currentUser?.id) return;
+
+    const payload = {
+      project_id: projectId,
+      actor_id: currentUser.id,
+      action,
+      entity_type: entityType,
+      entity_id: entityId,
+      entity_name: entityName,
+      details
+    };
+    const { data, error } = await supabase.from('project_logs').insert([payload]).select();
+    if (!error && data?.[0]) {
+      setProjectLogs([data[0], ...projectLogs]);
+    }
+  };
 
   const handlePanelDragStart = (e) => {
     if (e.target.tagName.toLowerCase() === 'button') return;
@@ -327,7 +385,92 @@ function App() {
     if (!error && data) {
       setProjects([...projects, data[0]]);
       setActiveProjectId(data[0].id);
+      appendProjectLog({
+        projectId: data[0].id,
+        action: 'create_project',
+        entityType: 'project',
+        entityId: data[0].id,
+        entityName: data[0].name
+      });
     }
+  };
+
+  const handleAddProjectMember = async (e) => {
+    e.preventDefault();
+    if (!activeProjectId || !memberUserId || !canManageProjectMembers) return;
+
+    const { data, error } = await supabase
+      .from('project_members')
+      .upsert([{ project_id: activeProjectId, user_id: memberUserId, role: memberRole }], { onConflict: 'project_id,user_id' })
+      .select();
+
+    if (error) {
+      alert('Ошибка добавления сотрудника в проект: ' + error.message);
+      return;
+    }
+
+    if (data?.[0]) {
+      setProjectMembers([
+        ...projectMembers.filter(member => !(member.project_id === activeProjectId && member.user_id === memberUserId)),
+        data[0]
+      ]);
+      const user = getUser(memberUserId);
+      appendProjectLog({
+        action: 'add_member',
+        entityType: 'member',
+        entityId: data[0].id,
+        entityName: user?.name || user?.email,
+        details: { role: memberRole }
+      });
+      setMemberUserId('');
+      setMemberRole('Участник');
+    }
+  };
+
+  const handleProjectMemberRoleChange = async (member, role) => {
+    if (!canManageProjectMembers) return;
+    const { data, error } = await supabase
+      .from('project_members')
+      .update({ role })
+      .eq('id', member.id)
+      .select();
+
+    if (error) {
+      alert('Ошибка изменения роли участника: ' + error.message);
+      return;
+    }
+
+    if (data?.[0]) {
+      setProjectMembers(projectMembers.map(item => item.id === member.id ? data[0] : item));
+      const user = getUser(member.user_id);
+      appendProjectLog({
+        action: 'update_member',
+        entityType: 'member',
+        entityId: member.id,
+        entityName: user?.name || user?.email,
+        details: { role }
+      });
+    }
+  };
+
+  const handleDeleteProjectMember = async (member) => {
+    if (!canManageProjectMembers) return;
+    const user = getUser(member.user_id);
+    if (!window.confirm(`Удалить ${user?.name || user?.email || 'сотрудника'} из проекта?`)) return;
+
+    const { error } = await supabase.from('project_members').delete().eq('id', member.id);
+    if (error) {
+      alert('Ошибка удаления участника проекта: ' + error.message);
+      return;
+    }
+
+    setProjectMembers(projectMembers.filter(item => item.id !== member.id));
+    appendProjectLog({
+      action: 'remove_member',
+      entityType: 'member',
+      entityId: member.id,
+      entityName: user?.name || user?.email
+    });
   };
 
   const handleDeleteProject = async (id) => {
@@ -353,6 +496,13 @@ function App() {
 
     setStages(stages.filter(s => s.id !== stage.id));
     setTasks(tasks.filter(t => t.stage_id !== stage.id));
+    appendProjectLog({
+      action: 'delete_stage',
+      entityType: 'stage',
+      entityId: stage.id,
+      entityName: stage.name,
+      details: { taskCount: stageTasks.length }
+    });
     if (selectedTask && selectedTask.stage_id === stage.id) {
       setSelectedTaskId(null);
     }
@@ -369,6 +519,12 @@ function App() {
     }
 
     setTasks(tasks.filter(t => t.id !== task.id));
+    appendProjectLog({
+      action: 'delete_task',
+      entityType: 'task',
+      entityId: task.id,
+      entityName: task.name
+    });
     if (selectedTaskId === task.id) {
       setSelectedTaskId(null);
     }
@@ -379,6 +535,14 @@ function App() {
     const { data, error } = await supabase.from('tasks').insert([newTask]).select();
     if (!error && data) {
       setTasks([...tasks, { ...data[0], subtask_count: 0, comment_count: 0, file_count: 0 }]);
+      const stage = stages.find(s => s.id === stageId);
+      appendProjectLog({
+        projectId: stage?.project_id,
+        action: 'create_task',
+        entityType: 'task',
+        entityId: data[0].id,
+        entityName: data[0].name
+      });
       handleSelectTask(data[0]);
     }
   };
@@ -390,17 +554,47 @@ function App() {
     const newOrder = projectStages.length > 0 ? projectStages[projectStages.length - 1].order + 1 : 1;
     const newStage = { project_id: activeProjectId, name, order: newOrder };
     const { data, error } = await supabase.from('stages').insert([newStage]).select();
-    if (!error && data) setStages([...stages, data[0]]);
+    if (!error && data) {
+      setStages([...stages, data[0]]);
+      appendProjectLog({
+        action: 'create_stage',
+        entityType: 'stage',
+        entityId: data[0].id,
+        entityName: data[0].name
+      });
+    }
   };
 
   const handleRenameStage = async (id, newName) => {
+    const oldStage = stages.find(s => s.id === id);
     setStages(stages.map(s => s.id === id ? { ...s, name: newName } : s));
     await supabase.from('stages').update({ name: newName }).eq('id', id);
+    if (oldStage && oldStage.name !== newName) {
+      appendProjectLog({
+        projectId: oldStage.project_id,
+        action: 'update_stage',
+        entityType: 'stage',
+        entityId: id,
+        entityName: newName,
+        details: { field: 'name', from: oldStage.name, to: newName }
+      });
+    }
   };
 
   const handleStageColorChange = async (id, newColor) => {
+    const oldStage = stages.find(s => s.id === id);
     setStages(stages.map(s => s.id === id ? { ...s, color: newColor } : s));
     await supabase.from('stages').update({ color: newColor }).eq('id', id);
+    if (oldStage && oldStage.color !== newColor) {
+      appendProjectLog({
+        projectId: oldStage.project_id,
+        action: 'update_stage',
+        entityType: 'stage',
+        entityId: id,
+        entityName: oldStage.name,
+        details: { field: 'color', from: oldStage.color, to: newColor }
+      });
+    }
   };
 
   const handleDragStartStage = (e, stageId) => {
@@ -714,6 +908,9 @@ function App() {
                 <div className="view-tabs">
                   <button className={`view-tab ${activeProjectView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveProjectView('kanban')}>Канбан (Карта)</button>
                   <button className={`view-tab ${activeProjectView === 'gantt' ? 'active' : ''}`} onClick={() => setActiveProjectView('gantt')}>Диаграмма Ганта</button>
+                  <button className={`view-tab ${activeProjectView === 'files' ? 'active' : ''}`} onClick={() => setActiveProjectView('files')}>Файлы</button>
+                  <button className={`view-tab ${activeProjectView === 'members' ? 'active' : ''}`} onClick={() => setActiveProjectView('members')}>Сотрудники</button>
+                  <button className={`view-tab ${activeProjectView === 'logs' ? 'active' : ''}`} onClick={() => setActiveProjectView('logs')}>Logs</button>
                 </div>
               </div>
               {activeProject && (
@@ -871,6 +1068,124 @@ function App() {
                     onSelectTask={(task) => handleSelectTask(task)} 
                   />
                 )}
+                {activeProjectView === 'files' && (
+                  <div className="project-files-view">
+                    {projectFiles.length > 0 ? projectFiles.map(file => {
+                      const task = tasks.find(item => item.id === file.task_id);
+                      const uploader = getUser(file.uploader_id);
+                      return (
+                        <div key={file.id} className="project-file-card">
+                          {isImageFile(file) ? (
+                            <a className="project-file-preview" href={file.file_url} target="_blank" rel="noreferrer">
+                              <img src={file.file_url} alt={file.file_name} />
+                            </a>
+                          ) : (
+                            <a className="project-file-preview file-icon" href={file.file_url} target="_blank" rel="noreferrer">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <path d="M14 2v6h6" />
+                              </svg>
+                            </a>
+                          )}
+                          <div className="project-file-info">
+                            <a href={file.file_url} target="_blank" rel="noreferrer" className="project-file-name">{file.file_name}</a>
+                            <div className="project-file-meta">
+                              <span>{formatFileSize(file.file_size)}</span>
+                              <span>{task?.name || 'Задача не найдена'}</span>
+                              <span>{uploader?.name || uploader?.email || 'Автор неизвестен'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <div className="empty-state">В проекте пока нет файлов</div>
+                    )}
+                  </div>
+                )}
+                {activeProjectView === 'members' && (
+                  <div className="project-members-view">
+                    {canManageProjectMembers && (
+                      <form className="project-member-form" onSubmit={handleAddProjectMember}>
+                        <select className="edit-select" value={memberUserId} onChange={(e) => setMemberUserId(e.target.value)} required>
+                          <option value="">Выберите сотрудника</option>
+                          {users.filter(user => !activeProjectMembers.some(member => member.user_id === user.id)).map(user => (
+                            <option key={user.id} value={user.id}>{user.name || user.email}</option>
+                          ))}
+                        </select>
+                        <select className="edit-select" value={memberRole} onChange={(e) => setMemberRole(e.target.value)}>
+                          <option value="Участник">Участник</option>
+                          <option value="Руководитель проекта">Руководитель проекта</option>
+                        </select>
+                        <button className="btn btn-primary" type="submit">Добавить</button>
+                      </form>
+                    )}
+                    <div className="project-member-list">
+                      {activeProjectMembers.length > 0 ? activeProjectMembers.map(member => {
+                        const user = getUser(member.user_id);
+                        const assignedCount = projectTasks.filter(task => task.assignee_id === member.user_id).length;
+                        return (
+                          <div key={member.id} className="project-member-row">
+                            <div className="project-member-person">
+                              {user?.avatar_url ? (
+                                <img src={user.avatar_url} alt="avatar" className="avatar sm" style={{objectFit: 'cover'}} />
+                              ) : (
+                                <div className="avatar sm" style={{backgroundColor: user?.avatar_color || '#3b82f6'}}>{getUserInitials(user?.name || user?.email)}</div>
+                              )}
+                              <div>
+                                <div className="project-member-name">{user?.name || user?.email || 'Сотрудник'}</div>
+                                <div className="project-member-email">{user?.email}</div>
+                              </div>
+                            </div>
+                            <div className="project-member-tasks">{assignedCount} задач</div>
+                            {canManageProjectMembers ? (
+                              <select className="edit-select compact" value={member.role} onChange={(e) => handleProjectMemberRoleChange(member, e.target.value)}>
+                                <option value="Участник">Участник</option>
+                                <option value="Руководитель проекта">Руководитель проекта</option>
+                              </select>
+                            ) : (
+                              <div className="project-member-role">{member.role}</div>
+                            )}
+                            {canManageProjectMembers && (
+                              <button className="btn btn-icon danger" title="Удалить из проекта" onClick={() => handleDeleteProjectMember(member)}>✕</button>
+                            )}
+                          </div>
+                        );
+                      }) : (
+                        <div className="empty-state">В проект пока не добавлены сотрудники</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {activeProjectView === 'logs' && (
+                  <div className="project-logs-view">
+                    {activeProjectLogs.length > 0 ? activeProjectLogs.map(log => {
+                      const actor = getUser(log.actor_id);
+                      return (
+                        <div key={log.id} className="project-log-row">
+                          <div className="project-log-time">{new Date(log.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                          <div className="project-log-body">
+                            <div>
+                              <span className="project-log-actor">{actor?.name || actor?.email || 'Пользователь'}</span>{' '}
+                              <span>{logActionLabels[log.action] || log.action}</span>{' '}
+                              {log.entity_name && <span className="project-log-entity">{log.entity_name}</span>}
+                            </div>
+                            {log.details && Object.keys(log.details).length > 0 && (
+                              <div className="project-log-details">
+                                {log.details.field && <>Поле: {log.details.field}. </>}
+                                {log.details.from && <>Было: {String(log.details.from)}. </>}
+                                {log.details.to && <>Стало: {String(log.details.to)}.</>}
+                                {log.details.role && <>Роль: {log.details.role}</>}
+                                {log.details.fileName && <>Файл: {log.details.fileName}</>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <div className="empty-state">В проекте пока нет записей</div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -884,7 +1199,41 @@ function App() {
                 currentUser={currentUser} 
                 users={users} 
                 stages={stages} 
-                onTaskUpdated={(updatedTask, indicatorPatch = {}) => setTasks(tasks.map(t => t.id === updatedTask.id ? { ...t, ...updatedTask, ...indicatorPatch } : t))} 
+                onTaskUpdated={(updatedTask, indicatorPatch = {}, logDetails = null) => {
+                  setTasks(tasks.map(t => t.id === updatedTask.id ? { ...t, ...updatedTask, ...indicatorPatch } : t));
+                  if (logDetails) {
+                    const stage = stages.find(s => s.id === updatedTask.stage_id);
+                    appendProjectLog({
+                      projectId: stage?.project_id,
+                      action: 'update_task',
+                      entityType: 'task',
+                      entityId: updatedTask.id,
+                      entityName: updatedTask.name,
+                      details: logDetails
+                    });
+                  }
+                }} 
+                onTaskFileAdded={(file) => {
+                  setTaskFiles([file, ...taskFiles]);
+                  appendProjectLog({
+                    action: 'upload_file',
+                    entityType: 'file',
+                    entityId: file.id,
+                    entityName: file.file_name,
+                    details: { fileName: file.file_name }
+                  });
+                }}
+                onTaskFileDeleted={(fileId) => {
+                  const file = taskFiles.find(item => item.id === fileId);
+                  setTaskFiles(taskFiles.filter(item => item.id !== fileId));
+                  appendProjectLog({
+                    action: 'delete_file',
+                    entityType: 'file',
+                    entityId: fileId,
+                    entityName: file?.file_name,
+                    details: { fileName: file?.file_name }
+                  });
+                }}
                 onTaskDeleted={(deletedTaskId) => {
                   setTasks(tasks.filter(t => t.id !== deletedTaskId));
                   setSelectedTaskId(null);

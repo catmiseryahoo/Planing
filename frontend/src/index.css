@@ -748,6 +748,10 @@ body {
   transition: all 0.2s;
   cursor: pointer;
 }
+.edit-select.compact {
+  width: 220px;
+  margin-bottom: 0;
+}
 
 .edit-select:hover {
   background: rgba(255, 255, 255, 0.1);
@@ -984,6 +988,132 @@ body {
 .task-file-size {
   color: var(--text-secondary);
   font-size: 0.75rem;
+}
+
+.project-files-view,
+.project-members-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.project-file-card,
+.project-member-row,
+.project-member-form {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+.project-file-preview {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+}
+.project-file-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.project-file-info {
+  min-width: 0;
+  flex: 1;
+}
+.project-file-name {
+  color: var(--text-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+.project-file-name:hover {
+  text-decoration: underline;
+}
+.project-file-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.project-member-form {
+  align-items: flex-start;
+}
+.project-member-form .edit-select {
+  margin-bottom: 0;
+}
+.project-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.project-member-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 100px 220px 44px;
+}
+.project-member-person {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.project-member-name {
+  font-weight: 700;
+}
+.project-member-email,
+.project-member-tasks,
+.project-member-role {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.empty-state {
+  padding: 2rem;
+  border: 1px dashed var(--panel-border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  text-align: center;
+}
+.project-logs-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.project-log-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+.project-log-time {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.project-log-body {
+  min-width: 0;
+}
+.project-log-actor {
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.project-log-entity {
+  color: var(--accent-hover);
+  font-weight: 700;
+}
+.project-log-details {
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
 }
 
 .attachment-size {

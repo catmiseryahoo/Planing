@@ -12,7 +12,7 @@ const statusLabels = {
   'overdue': 'Просрочено'
 };
 
-export default function TaskSidebar({ taskId, onClose, currentUser, users, stages, onTaskUpdated, onTaskDeleted, onDragStart }) {
+export default function TaskSidebar({ taskId, onClose, currentUser, users, stages, onTaskUpdated, onTaskDeleted, onTaskFileAdded, onTaskFileDeleted, onDragStart }) {
   const [task, setTask] = useState(null);
   const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
@@ -88,6 +88,8 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
         comment_count: comments.length + (commentText.trim() ? 1 : 0),
         file_count: files.length,
         is_modified: true
+      }, {
+        changedFields: ['name', 'status', 'assignee_id', 'date', 'desc'].filter(field => updates[field] !== task[field])
       });
       onClose(); // Закрываем панель после сохранения
     }
@@ -193,6 +195,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
 
         if (data?.[0]) {
           setFiles(currentFiles => [...currentFiles, data[0]]);
+          onTaskFileAdded(data[0]);
           onTaskUpdated(task, { file_count: files.length + 1 });
         }
       }
@@ -215,6 +218,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
 
     setFiles(files.filter(f => f.id !== file.id));
+    onTaskFileDeleted(file.id);
     onTaskUpdated(task, { file_count: Math.max(0, files.length - 1) });
   };
 
