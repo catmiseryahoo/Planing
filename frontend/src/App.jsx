@@ -1126,32 +1126,92 @@ function App() {
                     <div className="project-member-list">
                       {activeProjectMembers.length > 0 ? activeProjectMembers.map(member => {
                         const user = getUser(member.user_id);
-                        const assignedCount = projectTasks.filter(task => task.assignee_id === member.user_id).length;
+                        const assignedTasks = projectTasks.filter(task => task.assignee_id === member.user_id);
+                        const assignedCount = assignedTasks.length;
+                        const completedCount = assignedTasks.filter(task => task.status === 'done').length;
+                        const activeCount = assignedTasks.filter(task => task.status !== 'done').length;
+                        const overdueCount = assignedTasks.filter(task => {
+                          const dueDate = getDateOnly(task.date || task.due_date);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return dueDate && dueDate < today && task.status !== 'done';
+                        }).length;
+                        const donePercent = assignedCount > 0 ? Math.round((completedCount / assignedCount) * 100) : 0;
+                        const workloadPercent = Math.min(100, Math.round((activeCount / 8) * 100));
+                        const workloadLabel = activeCount >= 8 ? 'Перегруз' : activeCount >= 5 ? 'Высокая' : activeCount >= 2 ? 'Нормальная' : 'Свободен';
+                        const nextTask = assignedTasks
+                          .filter(task => task.status !== 'done' && getDateOnly(task.date || task.due_date))
+                          .sort((a, b) => getDateOnly(a.date || a.due_date) - getDateOnly(b.date || b.due_date))[0];
                         return (
-                          <div key={member.id} className="project-member-row">
-                            <div className="project-member-person">
+                          <div key={member.id} className="project-member-card">
+                            <div className="project-member-photo">
                               {user?.avatar_url ? (
-                                <img src={user.avatar_url} alt="avatar" className="avatar sm" style={{objectFit: 'cover'}} />
+                                <img src={user.avatar_url} alt={user?.name || user?.email || 'Сотрудник'} />
                               ) : (
-                                <div className="avatar sm" style={{backgroundColor: user?.avatar_color || '#3b82f6'}}>{getUserInitials(user?.name || user?.email)}</div>
+                                <div className="project-member-photo-fallback" style={{backgroundColor: user?.avatar_color || '#3b82f6'}}>{getUserInitials(user?.name || user?.email)}</div>
                               )}
-                              <div>
-                                <div className="project-member-name">{user?.name || user?.email || 'Сотрудник'}</div>
-                                <div className="project-member-email">{user?.email}</div>
+                            </div>
+                            <div className="project-member-card-body">
+                              <div className="project-member-card-head">
+                                <div>
+                                  <div className="project-member-name">{user?.name || user?.email || 'Сотрудник'}</div>
+                                  <div className="project-member-role">{member.role}</div>
+                                </div>
+                                {canManageProjectMembers && (
+                                  <button className="btn btn-icon danger" title="Удалить из проекта" onClick={() => handleDeleteProjectMember(member)}>✕</button>
+                                )}
+                              </div>
+                              <div className="project-member-contact-list">
+                                <div className="project-member-contact">
+                                  <span>Email</span>
+                                  <strong>{user?.email || 'Не указан'}</strong>
+                                </div>
+                                <div className="project-member-contact">
+                                  <span>Телефон</span>
+                                  <strong>{user?.phone || 'Не указан'}</strong>
+                                </div>
+                                <div className="project-member-contact">
+                                  <span>Системная роль</span>
+                                  <strong>{user?.role || 'Сотрудник'}</strong>
+                                </div>
+                                <div className="project-member-contact">
+                                  <span>Ближайший срок</span>
+                                  <strong>{nextTask ? formatDate(nextTask.date || nextTask.due_date) : 'Нет активных сроков'}</strong>
+                                </div>
+                              </div>
+                              <div className="project-member-stats">
+                                <div><strong>{assignedCount}</strong><span>всего</span></div>
+                                <div><strong>{activeCount}</strong><span>активно</span></div>
+                                <div><strong>{completedCount}</strong><span>готово</span></div>
+                                <div className={overdueCount > 0 ? 'danger' : ''}><strong>{overdueCount}</strong><span>просрочено</span></div>
+                              </div>
+                              <div className="project-member-load">
+                                <div className="project-member-load-row">
+                                  <span>Выполнение</span>
+                                  <strong>{donePercent}%</strong>
+                                </div>
+                                <div className="project-member-progress">
+                                  <span style={{ width: `${donePercent}%` }} />
+                                </div>
+                                <div className="project-member-load-row">
+                                  <span>Загрузка</span>
+                                  <strong>{workloadLabel}</strong>
+                                </div>
+                                <div className={`project-member-progress workload ${activeCount >= 8 ? 'danger' : activeCount >= 5 ? 'warning' : ''}`}>
+                                  <span style={{ width: `${workloadPercent}%` }} />
+                                </div>
+                              </div>
+                              <div className="project-member-card-actions">
+                                {canManageProjectMembers ? (
+                                  <select className="edit-select compact" value={member.role} onChange={(e) => handleProjectMemberRoleChange(member, e.target.value)}>
+                                    <option value="Участник">Участник</option>
+                                    <option value="Руководитель проекта">Руководитель проекта</option>
+                                  </select>
+                                ) : (
+                                  <div className="project-member-role-static">{member.role}</div>
+                                )}
                               </div>
                             </div>
-                            <div className="project-member-tasks">{assignedCount} задач</div>
-                            {canManageProjectMembers ? (
-                              <select className="edit-select compact" value={member.role} onChange={(e) => handleProjectMemberRoleChange(member, e.target.value)}>
-                                <option value="Участник">Участник</option>
-                                <option value="Руководитель проекта">Руководитель проекта</option>
-                              </select>
-                            ) : (
-                              <div className="project-member-role">{member.role}</div>
-                            )}
-                            {canManageProjectMembers && (
-                              <button className="btn btn-icon danger" title="Удалить из проекта" onClick={() => handleDeleteProjectMember(member)}>✕</button>
-                            )}
                           </div>
                         );
                       }) : (

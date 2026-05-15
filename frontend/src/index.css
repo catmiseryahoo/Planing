@@ -995,7 +995,6 @@ body {
   flex-direction: column;
   gap: 0.75rem;
 }
-.project-member-row,
 .project-member-form {
   display: flex;
   align-items: center;
@@ -1076,26 +1075,161 @@ body {
   margin-bottom: 0;
 }
 .project-member-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 360px));
+  gap: 1rem;
+  align-items: start;
+}
+.project-member-list .empty-state {
+  grid-column: 1 / -1;
+}
+.project-member-card {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
 }
-.project-member-row {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) 100px 220px 44px;
-}
-.project-member-person {
+.project-member-photo {
+  height: 180px;
   display: flex;
   align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.project-member-photo img,
+.project-member-photo-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.project-member-photo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 3rem;
+  font-weight: 900;
+}
+.project-member-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1rem;
+}
+.project-member-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 0.75rem;
-  min-width: 0;
 }
 .project-member-name {
+  color: var(--text-primary);
+  font-size: 1.08rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-member-role {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.project-member-contact-list {
+  display: grid;
+  gap: 0.45rem;
+}
+.project-member-contact {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.82rem;
+}
+.project-member-contact span {
+  color: var(--text-secondary);
+}
+.project-member-contact strong {
+  min-width: 0;
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-member-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+.project-member-stats div {
+  min-width: 0;
+  padding: 0.55rem 0.45rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.035);
+  text-align: center;
+}
+.project-member-stats strong,
+.project-member-stats span {
+  display: block;
+}
+.project-member-stats strong {
+  color: var(--text-primary);
+  font-size: 1.05rem;
+}
+.project-member-stats span {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+.project-member-stats .danger strong {
+  color: var(--danger);
+}
+.project-member-load {
+  display: grid;
+  gap: 0.35rem;
+}
+.project-member-load-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.project-member-load-row strong {
+  color: var(--text-primary);
   font-weight: 700;
 }
-.project-member-email,
-.project-member-tasks,
-.project-member-role {
+.project-member-progress {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.project-member-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.project-member-progress.workload span {
+  background: #22c55e;
+}
+.project-member-progress.workload.warning span {
+  background: #f59e0b;
+}
+.project-member-progress.workload.danger span {
+  background: var(--danger);
+}
+.project-member-card-actions .edit-select {
+  width: 100%;
+  margin-bottom: 0;
+}
+.project-member-role-static {
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
