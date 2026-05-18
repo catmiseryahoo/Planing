@@ -826,17 +826,16 @@ function App() {
                       style={{ '--project-color': project.color || '#3b82f6' }}
                       onClick={() => { setActiveProjectId(project.id); setSelectedTaskId(null); }}
                     >
+                      {(currentUser?.role === 'Администратор' || currentUser?.role === 'Менеджер проектов') && (
+                        <label className="project-side-color-control" title="Изменить цвет проекта" onClick={(e) => e.stopPropagation()}>
+                          <input type="color" value={project.color || '#3b82f6'} onChange={(e) => handleProjectColorChange(project, e.target.value)} />
+                        </label>
+                      )}
                       <div className="project-item-top">
                         <div className="project-title-group">
-                          <span className="project-color-dot"></span>
                           <div className="project-name">{project.name}</div>
                         </div>
                         <div className="project-actions" onClick={(e) => e.stopPropagation()}>
-                          {(currentUser?.role === 'Администратор' || currentUser?.role === 'Менеджер проектов') && (
-                            <label className="project-color-control" title="Цвет проекта">
-                              <input type="color" value={project.color || '#3b82f6'} onChange={(e) => handleProjectColorChange(project, e.target.value)} />
-                            </label>
-                          )}
                           {currentUser?.role === 'Администратор' && (
                              <button className="btn btn-icon project-delete-btn" title="Удалить проект" onClick={() => handleDeleteProject(project.id)}>✕</button>
                           )}
@@ -1010,7 +1009,6 @@ function App() {
             <>
               <div className="panel-header project-main-header" style={{ '--project-color': activeProject?.color || '#3b82f6' }}>
                 <h2>
-                  {activeProject && <span className="project-header-color"></span>}
                   {activeProject?.name || 'Выберите проект'}
                 </h2>
                 <div className="view-tabs">
