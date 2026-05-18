@@ -208,6 +208,8 @@ function App() {
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
   const [messengerText, setMessengerText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [selectedMessengerUserIds, setSelectedMessengerUserIds] = useState([]);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
 
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [activeView, setActiveView] = useState('map'); // map, profile, admin
@@ -242,6 +244,7 @@ function App() {
   const [isDragOverDropZone, setIsDragOverDropZone] = useState(false);
   const fileInputRef = useRef(null);
   const messengerEndRef = useRef(null);
+  const latestMessageAtRef = useRef('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -273,7 +276,7 @@ function App() {
         supabase.from('task_files').select('*').order('created_at', { ascending: false }),
         supabase.from('project_members').select('*'),
         supabase.from('project_logs').select('*').order('created_at', { ascending: false }).limit(300),
-        supabase.from('site_messages').select('*').order('created_at', { ascending: true }).limit(200)
+        supabase.from('site_messages').select('*').or(`recipient_ids.cs.{${session.user.id}},author_id.eq.${session.user.id},project_id.not.is.null`).order('created_at', { ascending: true }).limit(200)
       ]);
 
       const subtaskCounts = countByTaskId(subtasksRes.data);
@@ -294,6 +297,7 @@ function App() {
       setProjectMembers(membersRes.data || []);
       setProjectLogs(logsRes.data || []);
       setSiteMessages(messagesRes.data || []);
+      latestMessageAtRef.current = messagesRes.data?.at(-1)?.created_at || '';
 
       if (projectsRes.data?.length > 0 && !activeProjectId) {
         setActiveProjectId(projectsRes.data[0].id);
@@ -314,23 +318,33 @@ function App() {
     const { data, error } = await supabase
       .from('site_messages')
       .select('*')
+      .or(`recipient_ids.cs.{${currentUser.id}},author_id.eq.${currentUser.id},project_id.not.is.null`)
       .order('created_at', { ascending: true })
       .limit(200);
 
     if (!error) {
+      const latestSeenAt = latestMessageAtRef.current;
+      const incomingNewMessage = (data || []).some(message =>
+        message.created_at > latestSeenAt && message.author_id !== currentUser?.id
+      );
+      if (incomingNewMessage && !isMessengerOpen) {
+        setHasUnreadMessages(true);
+      }
+      latestMessageAtRef.current = data?.at(-1)?.created_at || latestSeenAt;
       setSiteMessages(data || []);
     }
   };
 
   useEffect(() => {
-    if (!session || !isMessengerOpen) return undefined;
+    if (!session || !currentUser) return undefined;
     fetchSiteMessages();
     const intervalId = window.setInterval(fetchSiteMessages, 5000);
     return () => window.clearInterval(intervalId);
-  }, [session, isMessengerOpen]);
+  }, [session, currentUser?.id, isMessengerOpen]);
 
   useEffect(() => {
     if (isMessengerOpen) {
+      setHasUnreadMessages(false);
       messengerEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [siteMessages, isMessengerOpen]);
@@ -415,6 +429,39 @@ function App() {
   
   const getUserInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '?';
   const getUser = (id) => users.find(u => u.id === id);
+  const activeProjectMemberIds = new Set(activeProjectMembers.map(member => member.user_id));
+  const canUseProjectChat = Boolean(activeProjectId) && (
+    activeProjectMemberIds.has(currentUser.id)
+    || currentUser.role === 'Администратор'
+    || currentUser.role === 'Менеджер проектов'
+  );
+  const messengerUsers = users.filter(user => user.id !== currentUser.id);
+  const selectedMessengerUsers = selectedMessengerUserIds
+    .map(id => getUser(id))
+    .filter(Boolean);
+  const conversationParticipantIds = [currentUser.id, ...selectedMessengerUserIds].sort();
+  const conversationTitle = selectedMessengerUsers.length
+    ? selectedMessengerUsers.map(user => user.name || user.email).join(', ')
+    : `Общий чат${activeProject ? `: ${activeProject.name}` : ''}`;
+  const getMessageParticipants = (message) => Array
+    .from(new Set([message.author_id, ...(message.recipient_ids || [])]))
+    .filter(Boolean)
+    .sort();
+  const isSameParticipantSet = (left, right) => left.length === right.length && left.every((item, index) => item === right[index]);
+  const conversationMessages = siteMessages.filter(message => {
+    const recipients = message.recipient_ids || [];
+    if (selectedMessengerUserIds.length === 0) {
+      return recipients.length === 0 && message.project_id === activeProjectId;
+    }
+    return isSameParticipantSet(getMessageParticipants(message), conversationParticipantIds);
+  });
+  const toggleMessengerRecipient = (userId) => {
+    setSelectedMessengerUserIds(currentIds =>
+      currentIds.includes(userId)
+        ? currentIds.filter(id => id !== userId)
+        : [...currentIds, userId]
+    );
+  };
 
   const appendProjectLog = async ({ projectId = activeProjectId, action, entityType, entityId, entityName, details = {} }) => {
     if (!projectId || !currentUser?.id) return;
@@ -438,11 +485,18 @@ function App() {
     e.preventDefault();
     const body = messengerText.trim();
     if (!body || !currentUser?.id || isSendingMessage) return;
+    if (selectedMessengerUserIds.length === 0 && !canUseProjectChat) {
+      alert('Общий чат доступен только участникам активного проекта');
+      return;
+    }
 
     setIsSendingMessage(true);
+    const projectId = selectedMessengerUserIds.length === 0 ? activeProjectId : null;
     const optimisticMessage = {
       id: `local-${Date.now()}`,
       author_id: currentUser.id,
+      recipient_ids: selectedMessengerUserIds,
+      project_id: projectId,
       body,
       created_at: new Date().toISOString(),
       isLocal: true
@@ -452,7 +506,7 @@ function App() {
 
     const { data, error } = await supabase
       .from('site_messages')
-      .insert([{ author_id: currentUser.id, body }])
+      .insert([{ author_id: currentUser.id, recipient_ids: selectedMessengerUserIds, project_id: projectId, body }])
       .select()
       .single();
 
@@ -853,7 +907,7 @@ function App() {
           )}
 
           <button
-            className={`btn btn-icon messenger-trigger ${isMessengerOpen ? 'active' : ''}`}
+            className={`btn btn-icon messenger-trigger ${isMessengerOpen ? 'active' : ''} ${hasUnreadMessages ? 'unread' : ''}`}
             title="Мессенджер"
             onClick={() => setIsMessengerOpen(!isMessengerOpen)}
           >
@@ -890,12 +944,37 @@ function App() {
           <div className="messenger-header">
             <div>
               <h3>Мессенджер</h3>
-              <span>Общий чат приложения</span>
+              <span>{conversationTitle}</span>
             </div>
             <button className="btn btn-icon close-panel-btn" title="Закрыть" onClick={() => setIsMessengerOpen(false)}>×</button>
           </div>
+          <div className="messenger-recipient-panel">
+            <div className="messenger-recipient-title">Кому пишем</div>
+            <div className="messenger-recipient-list">
+              <button
+                type="button"
+                className={`messenger-recipient-chip ${selectedMessengerUserIds.length === 0 ? 'active' : ''}`}
+                disabled={!canUseProjectChat}
+                onClick={() => setSelectedMessengerUserIds([])}
+                title={canUseProjectChat ? 'Общий чат активного проекта' : 'Вы не участник активного проекта'}
+              >
+                Общий чат проекта
+              </button>
+              {messengerUsers.map(user => (
+                <button
+                  key={user.id}
+                  type="button"
+                  className={`messenger-recipient-chip ${selectedMessengerUserIds.includes(user.id) ? 'active' : ''}`}
+                  onClick={() => toggleMessengerRecipient(user.id)}
+                  title={user.email}
+                >
+                  {user.name || user.email}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="messenger-messages">
-            {siteMessages.length > 0 ? siteMessages.map(message => {
+            {conversationMessages.length > 0 ? conversationMessages.map(message => {
               const author = getUser(message.author_id);
               const isMine = message.author_id === currentUser.id;
               return (
@@ -915,7 +994,11 @@ function App() {
                 </div>
               );
             }) : (
-              <div className="messenger-empty">Пока нет сообщений. Начните разговор.</div>
+              <div className="messenger-empty">
+                {selectedMessengerUserIds.length === 0 && !canUseProjectChat
+                  ? 'Общий чат доступен только участникам активного проекта.'
+                  : 'Пока нет сообщений в этой беседе.'}
+              </div>
             )}
             <div ref={messengerEndRef} />
           </div>
@@ -932,7 +1015,7 @@ function App() {
               placeholder="Написать сообщение..."
               rows={2}
             />
-            <button className="btn btn-primary" type="submit" disabled={!messengerText.trim() || isSendingMessage}>
+            <button className="btn btn-primary" type="submit" disabled={!messengerText.trim() || isSendingMessage || (selectedMessengerUserIds.length === 0 && !canUseProjectChat)}>
               Отправить
             </button>
           </form>
