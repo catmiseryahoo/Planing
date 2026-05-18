@@ -47,6 +47,9 @@ const formatFileSize = (size) => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const MESSENGER_SIDEBAR_WIDTH = 260;
+const MESSENGER_HEADER_HEIGHT = 76;
+
 const logActionLabels = {
   create_stage: 'создал этап',
   update_stage: 'изменил этап',
@@ -212,9 +215,11 @@ function App() {
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [messengerWindow, setMessengerWindow] = useState({
     x: Math.max(16, window.innerWidth - 760),
-    y: 84,
-    width: 720,
-    height: 620
+    y: 84
+  });
+  const [messengerChatSize, setMessengerChatSize] = useState({
+    width: 470,
+    height: 520
   });
   const [isDraggingMessenger, setIsDraggingMessenger] = useState(false);
   const [isResizingMessenger, setIsResizingMessenger] = useState(false);
@@ -254,6 +259,7 @@ function App() {
   const [isDragOverDropZone, setIsDragOverDropZone] = useState(false);
   const fileInputRef = useRef(null);
   const messengerEndRef = useRef(null);
+  const messengerTextareaRef = useRef(null);
   const latestMessageAtRef = useRef('');
 
   useEffect(() => {
@@ -370,9 +376,11 @@ function App() {
       }
 
       if (isResizingMessenger && messengerResizeStart) {
-        const nextWidth = Math.min(window.innerWidth - messengerResizeStart.x - 8, Math.max(520, messengerResizeStart.width + e.clientX - messengerResizeStart.mouseX));
-        const nextHeight = Math.min(window.innerHeight - messengerResizeStart.y - 8, Math.max(420, messengerResizeStart.height + e.clientY - messengerResizeStart.mouseY));
-        setMessengerWindow(current => ({ ...current, width: nextWidth, height: nextHeight }));
+        const maxChatWidth = Math.max(320, window.innerWidth - messengerResizeStart.x - MESSENGER_SIDEBAR_WIDTH - 8);
+        const maxChatHeight = Math.max(340, window.innerHeight - messengerResizeStart.y - MESSENGER_HEADER_HEIGHT - 8);
+        const nextWidth = Math.min(maxChatWidth, Math.max(320, messengerResizeStart.width + e.clientX - messengerResizeStart.mouseX));
+        const nextHeight = Math.min(maxChatHeight, Math.max(340, messengerResizeStart.height + e.clientY - messengerResizeStart.mouseY));
+        setMessengerChatSize({ width: nextWidth, height: nextHeight });
       }
     };
 
@@ -390,6 +398,13 @@ function App() {
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDraggingMessenger, isResizingMessenger, messengerDragOffset, messengerResizeStart]);
+
+  useEffect(() => {
+    const textarea = messengerTextareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = '0px';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [messengerText]);
 
 
   useEffect(() => {
@@ -521,8 +536,8 @@ function App() {
       mouseY: e.clientY,
       x: messengerWindow.x,
       y: messengerWindow.y,
-      width: messengerWindow.width,
-      height: messengerWindow.height
+      width: messengerChatSize.width,
+      height: messengerChatSize.height
     });
   };
 
@@ -1005,7 +1020,7 @@ function App() {
       {isMessengerOpen && (
         <div
           className="messenger-popover glass-panel"
-          style={{ left: messengerWindow.x, top: messengerWindow.y, width: messengerWindow.width, height: messengerWindow.height }}
+          style={{ left: messengerWindow.x, top: messengerWindow.y }}
         >
           <div className="messenger-header" onMouseDown={handleMessengerDragStart}>
             <div>
@@ -1014,7 +1029,7 @@ function App() {
             </div>
             <button className="btn btn-icon close-panel-btn" title="Закрыть" onClick={() => setIsMessengerOpen(false)}>×</button>
           </div>
-          <div className="messenger-layout">
+          <div className="messenger-layout" style={{ height: messengerChatSize.height }}>
             <aside className="messenger-sidebar">
               <div className="messenger-sidebar-title">Диалоги</div>
               <button
@@ -1051,7 +1066,7 @@ function App() {
                 ))}
               </div>
             </aside>
-            <section className="messenger-chat">
+            <section className="messenger-chat" style={{ width: messengerChatSize.width }}>
               <div className="messenger-chat-title">
                 <strong>{conversationTitle}</strong>
                 <span>{selectedMessengerUsers.length ? `${selectedMessengerUsers.length + 1} участников` : 'Проектный чат'}</span>
@@ -1087,6 +1102,7 @@ function App() {
               </div>
               <form className="messenger-form" onSubmit={handleSendSiteMessage}>
                 <textarea
+                  ref={messengerTextareaRef}
                   value={messengerText}
                   onChange={(e) => setMessengerText(e.target.value)}
                   onKeyDown={(e) => {
@@ -1096,10 +1112,13 @@ function App() {
                     }
                   }}
                   placeholder="Написать сообщение..."
-                  rows={2}
+                  rows={1}
                 />
-                <button className="btn btn-primary" type="submit" disabled={!messengerText.trim() || isSendingMessage || (selectedMessengerUserIds.length === 0 && !canUseProjectChat)}>
-                  Отправить
+                <button className="messenger-send-btn" type="submit" title="Отправить" disabled={!messengerText.trim() || isSendingMessage || (selectedMessengerUserIds.length === 0 && !canUseProjectChat)}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M22 2 11 13"></path>
+                    <path d="m22 2-7 20-4-9-9-4Z"></path>
+                  </svg>
                 </button>
               </form>
             </section>
