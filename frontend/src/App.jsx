@@ -202,8 +202,12 @@ function App() {
   const [taskFiles, setTaskFiles] = useState([]);
   const [projectMembers, setProjectMembers] = useState([]);
   const [projectLogs, setProjectLogs] = useState([]);
+  const [siteMessages, setSiteMessages] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [isMessengerOpen, setIsMessengerOpen] = useState(false);
+  const [messengerText, setMessengerText] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [activeView, setActiveView] = useState('map'); // map, profile, admin
@@ -237,6 +241,7 @@ function App() {
 
   const [isDragOverDropZone, setIsDragOverDropZone] = useState(false);
   const fileInputRef = useRef(null);
+  const messengerEndRef = useRef(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -258,7 +263,7 @@ function App() {
   const fetchData = async () => {
     setIsDataLoading(true);
     try {
-      const [projectsRes, stagesRes, tasksRes, profilesRes, subtasksRes, commentsRes, filesRes, membersRes, logsRes] = await Promise.all([
+      const [projectsRes, stagesRes, tasksRes, profilesRes, subtasksRes, commentsRes, filesRes, membersRes, logsRes, messagesRes] = await Promise.all([
         supabase.from('projects').select('*').order('created_at', { ascending: true }),
         supabase.from('stages').select('*').order('order', { ascending: true }),
         supabase.from('tasks').select('*'),
@@ -267,7 +272,8 @@ function App() {
         supabase.from('comments').select('task_id'),
         supabase.from('task_files').select('*').order('created_at', { ascending: false }),
         supabase.from('project_members').select('*'),
-        supabase.from('project_logs').select('*').order('created_at', { ascending: false }).limit(300)
+        supabase.from('project_logs').select('*').order('created_at', { ascending: false }).limit(300),
+        supabase.from('site_messages').select('*').order('created_at', { ascending: true }).limit(200)
       ]);
 
       const subtaskCounts = countByTaskId(subtasksRes.data);
@@ -287,6 +293,7 @@ function App() {
       setTaskFiles(filesRes.data || []);
       setProjectMembers(membersRes.data || []);
       setProjectLogs(logsRes.data || []);
+      setSiteMessages(messagesRes.data || []);
 
       if (projectsRes.data?.length > 0 && !activeProjectId) {
         setActiveProjectId(projectsRes.data[0].id);
@@ -302,6 +309,31 @@ function App() {
       setIsDataLoading(false);
     }
   };
+
+  const fetchSiteMessages = async () => {
+    const { data, error } = await supabase
+      .from('site_messages')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(200);
+
+    if (!error) {
+      setSiteMessages(data || []);
+    }
+  };
+
+  useEffect(() => {
+    if (!session || !isMessengerOpen) return undefined;
+    fetchSiteMessages();
+    const intervalId = window.setInterval(fetchSiteMessages, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [session, isMessengerOpen]);
+
+  useEffect(() => {
+    if (isMessengerOpen) {
+      messengerEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [siteMessages, isMessengerOpen]);
 
 
   useEffect(() => {
@@ -400,6 +432,40 @@ function App() {
     if (!error && data?.[0]) {
       setProjectLogs([data[0], ...projectLogs]);
     }
+  };
+
+  const handleSendSiteMessage = async (e) => {
+    e.preventDefault();
+    const body = messengerText.trim();
+    if (!body || !currentUser?.id || isSendingMessage) return;
+
+    setIsSendingMessage(true);
+    const optimisticMessage = {
+      id: `local-${Date.now()}`,
+      author_id: currentUser.id,
+      body,
+      created_at: new Date().toISOString(),
+      isLocal: true
+    };
+    setSiteMessages([...siteMessages, optimisticMessage]);
+    setMessengerText('');
+
+    const { data, error } = await supabase
+      .from('site_messages')
+      .insert([{ author_id: currentUser.id, body }])
+      .select()
+      .single();
+
+    setIsSendingMessage(false);
+
+    if (error) {
+      setSiteMessages(siteMessages);
+      setMessengerText(body);
+      alert('Ошибка отправки сообщения: ' + error.message);
+      return;
+    }
+
+    setSiteMessages(currentMessages => currentMessages.map(message => message.id === optimisticMessage.id ? data : message));
   };
 
   const handlePanelDragStart = (e) => {
@@ -786,6 +852,18 @@ function App() {
             </button>
           )}
 
+          <button
+            className={`btn btn-icon messenger-trigger ${isMessengerOpen ? 'active' : ''}`}
+            title="Мессенджер"
+            onClick={() => setIsMessengerOpen(!isMessengerOpen)}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+              <path d="M8 9h8" />
+              <path d="M8 13h5" />
+            </svg>
+          </button>
+
           <div 
             className="user-profile" 
             title="Личный кабинет" 
@@ -806,6 +884,60 @@ function App() {
           </button>
         </div>
       </header>
+
+      {isMessengerOpen && (
+        <div className="messenger-popover glass-panel">
+          <div className="messenger-header">
+            <div>
+              <h3>Мессенджер</h3>
+              <span>Общий чат приложения</span>
+            </div>
+            <button className="btn btn-icon close-panel-btn" title="Закрыть" onClick={() => setIsMessengerOpen(false)}>×</button>
+          </div>
+          <div className="messenger-messages">
+            {siteMessages.length > 0 ? siteMessages.map(message => {
+              const author = getUser(message.author_id);
+              const isMine = message.author_id === currentUser.id;
+              return (
+                <div key={message.id} className={`messenger-message ${isMine ? 'mine' : ''}`}>
+                  {!isMine && (
+                    <div className="avatar sm messenger-avatar" style={{backgroundColor: author?.avatar_color || '#3b82f6', backgroundImage: author?.avatar_url ? `url(${author.avatar_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}}>
+                      {!author?.avatar_url && getUserInitials(author?.name || author?.email)}
+                    </div>
+                  )}
+                  <div className="messenger-bubble">
+                    <div className="messenger-meta">
+                      <strong>{isMine ? 'Вы' : author?.name || author?.email || 'Пользователь'}</strong>
+                      <span>{new Date(message.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div className="messenger-text">{message.body}</div>
+                  </div>
+                </div>
+              );
+            }) : (
+              <div className="messenger-empty">Пока нет сообщений. Начните разговор.</div>
+            )}
+            <div ref={messengerEndRef} />
+          </div>
+          <form className="messenger-form" onSubmit={handleSendSiteMessage}>
+            <textarea
+              value={messengerText}
+              onChange={(e) => setMessengerText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendSiteMessage(e);
+                }
+              }}
+              placeholder="Написать сообщение..."
+              rows={2}
+            />
+            <button className="btn btn-primary" type="submit" disabled={!messengerText.trim() || isSendingMessage}>
+              Отправить
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="main-area">
         {activeView === 'map' && (
