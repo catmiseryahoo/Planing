@@ -255,6 +255,8 @@ function App() {
   const [memberRole, setMemberRole] = useState('Участник');
 
   const [adminEditingUser, setAdminEditingUser] = useState(null);
+  const [adminEditPassword, setAdminEditPassword] = useState('');
+  const [adminEditPasswordConfirm, setAdminEditPasswordConfirm] = useState('');
 
   const [isDragOverDropZone, setIsDragOverDropZone] = useState(false);
   const fileInputRef = useRef(null);
@@ -1216,7 +1218,11 @@ function App() {
                           <td>{u.email}</td>
                           <td>{u.phone || '—'}</td>
                           <td>
-                            <button className="btn btn-icon" onClick={() => setAdminEditingUser(u)} title="Редактировать">✏️</button>
+                            <button className="btn btn-icon" onClick={() => {
+                              setAdminEditingUser(u);
+                              setAdminEditPassword('');
+                              setAdminEditPasswordConfirm('');
+                            }} title="Редактировать">✏️</button>
                           </td>
                         </tr>
                       ))}
@@ -1229,7 +1235,11 @@ function App() {
                     <div>
                       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '1rem'}}>
                         <h3>Редактирование: {adminEditingUser.name}</h3>
-                        <button className="btn btn-icon" onClick={() => setAdminEditingUser(null)}>✕</button>
+                        <button className="btn btn-icon" onClick={() => {
+                          setAdminEditingUser(null);
+                          setAdminEditPassword('');
+                          setAdminEditPasswordConfirm('');
+                        }}>✕</button>
                       </div>
                       <div className="detail-section">
                         <div className="detail-label">ФИО</div>
@@ -1252,6 +1262,25 @@ function App() {
                           <option value="Разработчик">Разработчик</option>
                           <option value="Сотрудник">Сотрудник</option>
                         </select>
+                      </div>
+                      <div className="detail-section">
+                        <div className="detail-label">Новый пароль</div>
+                        <input
+                          className="edit-select"
+                          type="password"
+                          value={adminEditPassword}
+                          onChange={e => setAdminEditPassword(e.target.value)}
+                          placeholder="Оставьте пустым, если не менять"
+                          minLength={6}
+                        />
+                        <input
+                          className="edit-select"
+                          type="password"
+                          value={adminEditPasswordConfirm}
+                          onChange={e => setAdminEditPasswordConfirm(e.target.value)}
+                          placeholder="Повторите новый пароль"
+                          minLength={6}
+                        />
                       </div>
                       <div className="detail-section">
                         <div className="detail-label">Фото сотрудника</div>
@@ -1303,12 +1332,35 @@ function App() {
                             }
                           }
 
+                          if (adminEditPassword || adminEditPasswordConfirm) {
+                            if (adminEditPassword.length < 6) {
+                              alert('Пароль должен быть не короче 6 символов');
+                              return;
+                            }
+
+                            if (adminEditPassword !== adminEditPasswordConfirm) {
+                              alert('Пароли не совпадают');
+                              return;
+                            }
+
+                            const { error: passwordError } = await supabase.functions.invoke('update-user-password', {
+                              body: { userId: id, password: adminEditPassword }
+                            });
+
+                            if (passwordError) {
+                              alert('Ошибка изменения пароля: ' + passwordError.message);
+                              return;
+                            }
+                          }
+
                           const { error } = await supabase.from('profiles').update({ email: nextEmail, name, phone, role, avatar_color, avatar_url }).eq('id', id);
                           if (!error) {
                              const updatedUser = { ...adminEditingUser, email: nextEmail };
                              setUsers(users.map(u => u.id === id ? updatedUser : u));
                              if (id === currentUser.id) setCurrentUser({...currentUser, email: nextEmail, name, phone, role, avatar_color, avatar_url});
                              setAdminEditingUser(null);
+                             setAdminEditPassword('');
+                             setAdminEditPasswordConfirm('');
                           } else {
                              alert('Ошибка: ' + error.message);
                           }

@@ -8,6 +8,8 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
   const [profileTelegram, setProfileTelegram] = useState(currentUser.telegram || '');
   const [profileAvatarColor, setProfileAvatarColor] = useState(currentUser.avatar_color || '#3b82f6');
   const [profileAvatarUrl, setProfileAvatarUrl] = useState(currentUser.avatar_url || '');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
 
   useEffect(() => {
     setProfileEmail(currentUser.email || '');
@@ -64,6 +66,36 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
     } else {
       alert("Ошибка обновления профиля: " + error.message);
     }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (currentUser.role !== 'Администратор') return;
+
+    if (newPassword.length < 6) {
+      alert("Пароль должен быть не короче 6 символов.");
+      return;
+    }
+
+    if (newPassword !== newPasswordConfirm) {
+      alert("Пароли не совпадают.");
+      return;
+    }
+
+    const { error } = await supabase.functions.invoke('update-user-password', {
+      body: {
+        userId: currentUser.id,
+        password: newPassword
+      }
+    });
+
+    if (error) {
+      alert("Ошибка изменения пароля: " + error.message);
+      return;
+    }
+
+    setNewPassword('');
+    setNewPasswordConfirm('');
+    alert("Пароль обновлен!");
   };
 
   const handlePhoneChange = (e) => {
@@ -145,6 +177,28 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
           </div>
         </div>
         <button className="btn btn-primary" onClick={handleUpdateProfile}>Сохранить изменения</button>
+        {currentUser.role === 'Администратор' && (
+          <div className="detail-section password-section">
+            <div className="detail-label">Смена пароля</div>
+            <input
+              className="edit-select"
+              type="password"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              placeholder="Новый пароль"
+              minLength={6}
+            />
+            <input
+              className="edit-select"
+              type="password"
+              value={newPasswordConfirm}
+              onChange={e => setNewPasswordConfirm(e.target.value)}
+              placeholder="Повторите пароль"
+              minLength={6}
+            />
+            <button className="btn" onClick={handleUpdatePassword}>Обновить пароль</button>
+          </div>
+        )}
       </div>
     </>
   );

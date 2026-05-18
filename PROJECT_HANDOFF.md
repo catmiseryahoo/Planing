@@ -56,6 +56,11 @@ codex mcp login supabase
 - Администратор может сменить email сотрудника в админ-панели.
 - `update-user-email` проверяет JWT, разрешает self-update или роль `Администратор`, обновляет Supabase Auth и `profiles.email`.
 - Edge Function `update-user-email` развернута в Supabase, статус `ACTIVE`, `verify_jwt=true`.
+- Смена пароля вынесена в Supabase Edge Function:
+  - `supabase/functions/update-user-password/index.ts`
+- Администратор может менять пароль себе в личном кабинете и сотрудникам в админ-панели.
+- `update-user-password` проверяет JWT, требует роль `Администратор` и обновляет пароль через Supabase Auth Admin API.
+- Edge Function `update-user-password` развернута в Supabase, статус `ACTIVE`, `verify_jwt=true`.
 
 ### Задачи и свойства задачи
 

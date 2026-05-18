@@ -950,6 +950,14 @@ body {
 .detail-section {
   margin-bottom: 1.5rem;
 }
+.password-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--panel-border);
+}
+.password-section .edit-select {
+  margin-bottom: 0.75rem;
+}
 .detail-label {
   font-size: 0.75rem;
   text-transform: uppercase;
