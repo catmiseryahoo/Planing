@@ -368,11 +368,21 @@ body {
   gap: 0.5rem;
 }
 .project-item {
+  position: relative;
   padding: 0.75rem 1rem;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
   border: 1px solid transparent;
+  overflow: hidden;
+}
+.project-item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--project-color, var(--accent-color));
+  opacity: 0.85;
 }
 .project-item:hover {
   background: rgba(255, 255, 255, 0.03);
@@ -384,13 +394,89 @@ body {
 }
 .project-name {
   font-weight: 500;
-  margin-bottom: 0.25rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .project-meta {
   font-size: 0.75rem;
   color: var(--text-secondary);
   display: flex;
   gap: 0.75rem;
+  margin-top: 0.35rem;
+  padding-left: 1.15rem;
+}
+.project-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.project-title-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.55rem;
+}
+.project-color-dot,
+.project-header-color {
+  flex-shrink: 0;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 999px;
+  background: var(--project-color, var(--accent-color));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--project-color, var(--accent-color)) 18%, transparent);
+}
+.project-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+.project-item:hover .project-actions,
+.project-item.active .project-actions {
+  opacity: 1;
+}
+.project-color-control {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.project-color-control::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: var(--project-color, var(--accent-color));
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.16);
+}
+.project-color-control:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.project-color-control input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.project-delete-btn {
+  padding: 2px;
+  color: var(--status-overdue-text);
+}
+.project-main-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 /* Map View Elements */

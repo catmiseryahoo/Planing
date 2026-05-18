@@ -60,6 +60,7 @@ const logActionLabels = {
   add_comment: 'добавил комментарий',
   upload_file: 'добавил файл',
   delete_file: 'удалил файл',
+  update_project: 'изменил проект',
   add_member: 'добавил сотрудника',
   update_member: 'изменил роль сотрудника',
   remove_member: 'удалил сотрудника'
@@ -443,7 +444,7 @@ function App() {
       alert('У вас нет прав для создания проектов');
       return;
     }
-    const { data, error } = await supabase.from('projects').insert([{ name: 'Новый проект', status: 'В работе' }]).select();
+    const { data, error } = await supabase.from('projects').insert([{ name: 'Новый проект', status: 'В работе', color: '#3b82f6' }]).select();
     if (!error && data) {
       setProjects([...projects, data[0]]);
       setActiveProjectId(data[0].id);
@@ -542,6 +543,33 @@ function App() {
       setProjects(projects.filter(p => p.id !== id));
       if (activeProjectId === id) setActiveProjectId(null);
     }
+  };
+
+  const handleProjectColorChange = async (project, color) => {
+    if (!project || project.color === color) return;
+    if (currentUser?.role !== 'Администратор' && currentUser?.role !== 'Менеджер проектов') {
+      alert('У вас нет прав для изменения проекта');
+      return;
+    }
+
+    const previousColor = project.color || '#3b82f6';
+    setProjects(projects.map(item => item.id === project.id ? { ...item, color } : item));
+
+    const { error } = await supabase.from('projects').update({ color }).eq('id', project.id);
+    if (error) {
+      setProjects(projects);
+      alert('Ошибка изменения цвета проекта: ' + error.message);
+      return;
+    }
+
+    appendProjectLog({
+      projectId: project.id,
+      action: 'update_project',
+      entityType: 'project',
+      entityId: project.id,
+      entityName: project.name,
+      details: { changes: [{ field: 'color', label: 'Цвет проекта', from: previousColor, to: color }] }
+    });
   };
 
   const handleDeleteStage = async (stage) => {
@@ -792,12 +820,27 @@ function App() {
                   const projectTasks = tasks.filter(t => stages.some(s => s.project_id === project.id && s.id === t.stage_id));
                   const overdueCount = projectTasks.filter(t => t.status === 'overdue').length;
                   return (
-                    <div key={project.id} className={`project-item ${activeProjectId === project.id ? 'active' : ''}`} onClick={() => { setActiveProjectId(project.id); setSelectedTaskId(null); }}>
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                        <div className="project-name">{project.name}</div>
-                        {currentUser?.role === 'Администратор' && (
-                           <button className="btn btn-icon" style={{padding: '2px', color: 'var(--status-overdue-text)'}} onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }}>✕</button>
-                        )}
+                    <div
+                      key={project.id}
+                      className={`project-item ${activeProjectId === project.id ? 'active' : ''}`}
+                      style={{ '--project-color': project.color || '#3b82f6' }}
+                      onClick={() => { setActiveProjectId(project.id); setSelectedTaskId(null); }}
+                    >
+                      <div className="project-item-top">
+                        <div className="project-title-group">
+                          <span className="project-color-dot"></span>
+                          <div className="project-name">{project.name}</div>
+                        </div>
+                        <div className="project-actions" onClick={(e) => e.stopPropagation()}>
+                          {(currentUser?.role === 'Администратор' || currentUser?.role === 'Менеджер проектов') && (
+                            <label className="project-color-control" title="Цвет проекта">
+                              <input type="color" value={project.color || '#3b82f6'} onChange={(e) => handleProjectColorChange(project, e.target.value)} />
+                            </label>
+                          )}
+                          {currentUser?.role === 'Администратор' && (
+                             <button className="btn btn-icon project-delete-btn" title="Удалить проект" onClick={() => handleDeleteProject(project.id)}>✕</button>
+                          )}
+                        </div>
                       </div>
                       <div className="project-meta">
                         <span>{projectTasks.length} задач</span>
@@ -965,8 +1008,11 @@ function App() {
           {/* MAP VIEW */}
           {activeView === 'map' && (
             <>
-              <div className="panel-header">
-                <h2>{activeProject?.name || 'Выберите проект'}</h2>
+              <div className="panel-header project-main-header" style={{ '--project-color': activeProject?.color || '#3b82f6' }}>
+                <h2>
+                  {activeProject && <span className="project-header-color"></span>}
+                  {activeProject?.name || 'Выберите проект'}
+                </h2>
                 <div className="view-tabs">
                   <button className={`view-tab ${activeProjectView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveProjectView('kanban')}>Канбан (Карта)</button>
                   <button className={`view-tab ${activeProjectView === 'gantt' ? 'active' : ''}`} onClick={() => setActiveProjectView('gantt')}>Диаграмма Ганта</button>
