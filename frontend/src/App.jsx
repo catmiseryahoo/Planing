@@ -210,6 +210,16 @@ function App() {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [selectedMessengerUserIds, setSelectedMessengerUserIds] = useState([]);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const [messengerWindow, setMessengerWindow] = useState({
+    x: Math.max(16, window.innerWidth - 760),
+    y: 84,
+    width: 720,
+    height: 620
+  });
+  const [isDraggingMessenger, setIsDraggingMessenger] = useState(false);
+  const [isResizingMessenger, setIsResizingMessenger] = useState(false);
+  const [messengerDragOffset, setMessengerDragOffset] = useState({ x: 0, y: 0 });
+  const [messengerResizeStart, setMessengerResizeStart] = useState(null);
 
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [activeView, setActiveView] = useState('map'); // map, profile, admin
@@ -349,6 +359,38 @@ function App() {
     }
   }, [siteMessages, isMessengerOpen]);
 
+  useEffect(() => {
+    if (!isDraggingMessenger && !isResizingMessenger) return undefined;
+
+    const handleMouseMove = (e) => {
+      if (isDraggingMessenger) {
+        const nextX = Math.min(window.innerWidth - 120, Math.max(8, e.clientX - messengerDragOffset.x));
+        const nextY = Math.min(window.innerHeight - 80, Math.max(8, e.clientY - messengerDragOffset.y));
+        setMessengerWindow(current => ({ ...current, x: nextX, y: nextY }));
+      }
+
+      if (isResizingMessenger && messengerResizeStart) {
+        const nextWidth = Math.min(window.innerWidth - messengerResizeStart.x - 8, Math.max(520, messengerResizeStart.width + e.clientX - messengerResizeStart.mouseX));
+        const nextHeight = Math.min(window.innerHeight - messengerResizeStart.y - 8, Math.max(420, messengerResizeStart.height + e.clientY - messengerResizeStart.mouseY));
+        setMessengerWindow(current => ({ ...current, width: nextWidth, height: nextHeight }));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingMessenger(false);
+      setIsResizingMessenger(false);
+      setMessengerResizeStart(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingMessenger, isResizingMessenger, messengerDragOffset, messengerResizeStart]);
+
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -461,6 +503,27 @@ function App() {
         ? currentIds.filter(id => id !== userId)
         : [...currentIds, userId]
     );
+  };
+  const handleMessengerDragStart = (e) => {
+    if (e.target.closest('button')) return;
+    setIsDraggingMessenger(true);
+    setMessengerDragOffset({
+      x: e.clientX - messengerWindow.x,
+      y: e.clientY - messengerWindow.y
+    });
+  };
+  const handleMessengerResizeStart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizingMessenger(true);
+    setMessengerResizeStart({
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      x: messengerWindow.x,
+      y: messengerWindow.y,
+      width: messengerWindow.width,
+      height: messengerWindow.height
+    });
   };
 
   const appendProjectLog = async ({ projectId = activeProjectId, action, entityType, entityId, entityName, details = {} }) => {
@@ -940,85 +1003,110 @@ function App() {
       </header>
 
       {isMessengerOpen && (
-        <div className="messenger-popover glass-panel">
-          <div className="messenger-header">
+        <div
+          className="messenger-popover glass-panel"
+          style={{ left: messengerWindow.x, top: messengerWindow.y, width: messengerWindow.width, height: messengerWindow.height }}
+        >
+          <div className="messenger-header" onMouseDown={handleMessengerDragStart}>
             <div>
               <h3>Мессенджер</h3>
               <span>{conversationTitle}</span>
             </div>
             <button className="btn btn-icon close-panel-btn" title="Закрыть" onClick={() => setIsMessengerOpen(false)}>×</button>
           </div>
-          <div className="messenger-recipient-panel">
-            <div className="messenger-recipient-title">Кому пишем</div>
-            <div className="messenger-recipient-list">
+          <div className="messenger-layout">
+            <aside className="messenger-sidebar">
+              <div className="messenger-sidebar-title">Диалоги</div>
               <button
                 type="button"
-                className={`messenger-recipient-chip ${selectedMessengerUserIds.length === 0 ? 'active' : ''}`}
+                className={`messenger-dialog-item ${selectedMessengerUserIds.length === 0 ? 'active' : ''}`}
                 disabled={!canUseProjectChat}
                 onClick={() => setSelectedMessengerUserIds([])}
                 title={canUseProjectChat ? 'Общий чат активного проекта' : 'Вы не участник активного проекта'}
               >
-                Общий чат проекта
+                <div className="messenger-dialog-avatar project-chat">#</div>
+                <div className="messenger-dialog-info">
+                  <strong>Общий чат проекта</strong>
+                  <span>{activeProject?.name || 'Проект не выбран'}</span>
+                </div>
               </button>
-              {messengerUsers.map(user => (
+              <div className="messenger-sidebar-title muted">Сотрудники</div>
+              <div className="messenger-user-list">
+                {messengerUsers.map(user => (
                 <button
                   key={user.id}
                   type="button"
-                  className={`messenger-recipient-chip ${selectedMessengerUserIds.includes(user.id) ? 'active' : ''}`}
+                  className={`messenger-dialog-item ${selectedMessengerUserIds.includes(user.id) ? 'active' : ''}`}
                   onClick={() => toggleMessengerRecipient(user.id)}
                   title={user.email}
                 >
-                  {user.name || user.email}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="messenger-messages">
-            {conversationMessages.length > 0 ? conversationMessages.map(message => {
-              const author = getUser(message.author_id);
-              const isMine = message.author_id === currentUser.id;
-              return (
-                <div key={message.id} className={`messenger-message ${isMine ? 'mine' : ''}`}>
-                  {!isMine && (
-                    <div className="avatar sm messenger-avatar" style={{backgroundColor: author?.avatar_color || '#3b82f6', backgroundImage: author?.avatar_url ? `url(${author.avatar_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}}>
-                      {!author?.avatar_url && getUserInitials(author?.name || author?.email)}
-                    </div>
-                  )}
-                  <div className="messenger-bubble">
-                    <div className="messenger-meta">
-                      <strong>{isMine ? 'Вы' : author?.name || author?.email || 'Пользователь'}</strong>
-                      <span>{new Date(message.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                    <div className="messenger-text">{message.body}</div>
+                  <div className="messenger-dialog-avatar" style={{backgroundColor: user.avatar_color || '#3b82f6', backgroundImage: user.avatar_url ? `url(${user.avatar_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}}>
+                    {!user.avatar_url && getUserInitials(user.name || user.email)}
                   </div>
-                </div>
-              );
-            }) : (
-              <div className="messenger-empty">
-                {selectedMessengerUserIds.length === 0 && !canUseProjectChat
-                  ? 'Общий чат доступен только участникам активного проекта.'
-                  : 'Пока нет сообщений в этой беседе.'}
+                  <div className="messenger-dialog-info">
+                    <strong>{user.name || user.email}</strong>
+                    <span>{selectedMessengerUserIds.includes(user.id) ? 'Выбран' : user.email}</span>
+                  </div>
+                </button>
+                ))}
               </div>
-            )}
-            <div ref={messengerEndRef} />
+            </aside>
+            <section className="messenger-chat">
+              <div className="messenger-chat-title">
+                <strong>{conversationTitle}</strong>
+                <span>{selectedMessengerUsers.length ? `${selectedMessengerUsers.length + 1} участников` : 'Проектный чат'}</span>
+              </div>
+              <div className="messenger-messages">
+                {conversationMessages.length > 0 ? conversationMessages.map(message => {
+                  const author = getUser(message.author_id);
+                  const isMine = message.author_id === currentUser.id;
+                  return (
+                    <div key={message.id} className={`messenger-message ${isMine ? 'mine' : ''}`}>
+                      {!isMine && (
+                        <div className="avatar sm messenger-avatar" style={{backgroundColor: author?.avatar_color || '#3b82f6', backgroundImage: author?.avatar_url ? `url(${author.avatar_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}}>
+                          {!author?.avatar_url && getUserInitials(author?.name || author?.email)}
+                        </div>
+                      )}
+                      <div className="messenger-bubble">
+                        <div className="messenger-meta">
+                          <strong>{isMine ? 'Вы' : author?.name || author?.email || 'Пользователь'}</strong>
+                          <span>{new Date(message.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <div className="messenger-text">{message.body}</div>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="messenger-empty">
+                    {selectedMessengerUserIds.length === 0 && !canUseProjectChat
+                      ? 'Общий чат доступен только участникам активного проекта.'
+                      : 'Пока нет сообщений в этой беседе.'}
+                  </div>
+                )}
+                <div ref={messengerEndRef} />
+              </div>
+              <form className="messenger-form" onSubmit={handleSendSiteMessage}>
+                <textarea
+                  value={messengerText}
+                  onChange={(e) => setMessengerText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendSiteMessage(e);
+                    }
+                  }}
+                  placeholder="Написать сообщение..."
+                  rows={2}
+                />
+                <button className="btn btn-primary" type="submit" disabled={!messengerText.trim() || isSendingMessage || (selectedMessengerUserIds.length === 0 && !canUseProjectChat)}>
+                  Отправить
+                </button>
+              </form>
+            </section>
           </div>
-          <form className="messenger-form" onSubmit={handleSendSiteMessage}>
-            <textarea
-              value={messengerText}
-              onChange={(e) => setMessengerText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendSiteMessage(e);
-                }
-              }}
-              placeholder="Написать сообщение..."
-              rows={2}
-            />
-            <button className="btn btn-primary" type="submit" disabled={!messengerText.trim() || isSendingMessage || (selectedMessengerUserIds.length === 0 && !canUseProjectChat)}>
-              Отправить
-            </button>
-          </form>
+          <button className="messenger-resize-handle" title="Изменить размер" onMouseDown={handleMessengerResizeStart}>
+            <span></span>
+          </button>
         </div>
       )}
 
@@ -1129,6 +1217,10 @@ function App() {
                         <input className="edit-select" value={adminEditingUser.name || ''} onChange={e => setAdminEditingUser({...adminEditingUser, name: e.target.value})} />
                       </div>
                       <div className="detail-section">
+                        <div className="detail-label">Email для входа</div>
+                        <input className="edit-select" type="email" value={adminEditingUser.email || ''} onChange={e => setAdminEditingUser({...adminEditingUser, email: e.target.value})} />
+                      </div>
+                      <div className="detail-section">
                         <div className="detail-label">Телефон</div>
                         <input className="edit-select" value={adminEditingUser.phone || ''} onChange={e => setAdminEditingUser({...adminEditingUser, phone: e.target.value})} />
                       </div>
@@ -1172,11 +1264,31 @@ function App() {
                         </div>
                       </div>
                       <button className="btn btn-primary" onClick={async () => {
-                          const { id, name, phone, role, avatar_color, avatar_url } = adminEditingUser;
-                          const { error } = await supabase.from('profiles').update({ name, phone, role, avatar_color, avatar_url }).eq('id', id);
+                          const { id, email, name, phone, role, avatar_color, avatar_url } = adminEditingUser;
+                          const nextEmail = (email || '').trim().toLowerCase();
+                          const originalUser = users.find(u => u.id === id);
+
+                          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+                            alert('Введите корректный Email');
+                            return;
+                          }
+
+                          if (nextEmail !== (originalUser?.email || '').toLowerCase()) {
+                            const { error: emailError } = await supabase.functions.invoke('update-user-email', {
+                              body: { userId: id, email: nextEmail }
+                            });
+
+                            if (emailError) {
+                              alert('Ошибка изменения Email: ' + emailError.message);
+                              return;
+                            }
+                          }
+
+                          const { error } = await supabase.from('profiles').update({ email: nextEmail, name, phone, role, avatar_color, avatar_url }).eq('id', id);
                           if (!error) {
-                             setUsers(users.map(u => u.id === id ? adminEditingUser : u));
-                             if (id === currentUser.id) setCurrentUser({...currentUser, name, phone, role, avatar_color, avatar_url});
+                             const updatedUser = { ...adminEditingUser, email: nextEmail };
+                             setUsers(users.map(u => u.id === id ? updatedUser : u));
+                             if (id === currentUser.id) setCurrentUser({...currentUser, email: nextEmail, name, phone, role, avatar_color, avatar_url});
                              setAdminEditingUser(null);
                           } else {
                              alert('Ошибка: ' + error.message);

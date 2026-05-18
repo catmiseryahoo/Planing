@@ -50,6 +50,12 @@ codex mcp login supabase
 - Создание пользователей вынесено в Supabase Edge Function:
   - `supabase/functions/create-user/index.ts`
 - Админ-панель вызывает Edge Function через `supabase.functions.invoke('create-user', ...)`.
+- Смена email вынесена в Supabase Edge Function:
+  - `supabase/functions/update-user-email/index.ts`
+- Пользователь может сменить свой email в личном кабинете.
+- Администратор может сменить email сотрудника в админ-панели.
+- `update-user-email` проверяет JWT, разрешает self-update или роль `Администратор`, обновляет Supabase Auth и `profiles.email`.
+- Edge Function `update-user-email` развернута в Supabase, статус `ACTIVE`, `verify_jwt=true`.
 
 ### Задачи и свойства задачи
 
@@ -187,6 +193,12 @@ details: {
 - Кнопка мессенджера рядом с личным кабинетом.
 - Кнопка зеленая.
 - При новом входящем сообщении, когда окно закрыто, кнопка медленно мигает.
+- Окно можно свободно перемещать за верхнюю шапку.
+- Окно можно свободно изменять по размеру через правый нижний угол.
+- Логика интерфейса похожа на WhatsApp:
+  - слева список диалогов и сотрудников;
+  - справа текущая переписка;
+  - в списке слева используются аватары сотрудников, если они есть.
 - Отправка:
   - `Enter` отправляет;
   - `Shift + Enter` переносит строку.

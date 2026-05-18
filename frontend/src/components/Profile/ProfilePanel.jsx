@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 
 export default function ProfilePanel({ currentUser, users, setUsers, setCurrentUser }) {
+  const [profileEmail, setProfileEmail] = useState(currentUser.email || '');
   const [profileName, setProfileName] = useState(currentUser.name || '');
   const [profilePhone, setProfilePhone] = useState(currentUser.phone || '');
   const [profileTelegram, setProfileTelegram] = useState(currentUser.telegram || '');
@@ -9,6 +10,7 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
   const [profileAvatarUrl, setProfileAvatarUrl] = useState(currentUser.avatar_url || '');
 
   useEffect(() => {
+    setProfileEmail(currentUser.email || '');
     setProfileName(currentUser.name || '');
     setProfilePhone(currentUser.phone || '');
     setProfileTelegram(currentUser.telegram || '');
@@ -19,13 +21,34 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
   const getUserInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '?';
 
   const handleUpdateProfile = async () => {
+    const nextEmail = profileEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+      alert("Пожалуйста, введите корректный Email.");
+      return;
+    }
+
     const phoneDigits = profilePhone.replace(/\D/g, '');
     if (phoneDigits && phoneDigits.length < 11) {
       alert("Пожалуйста, введите полный номер телефона (11 цифр).");
       return;
     }
 
+    if (nextEmail !== (currentUser.email || '').toLowerCase()) {
+      const { error: emailError } = await supabase.functions.invoke('update-user-email', {
+        body: {
+          userId: currentUser.id,
+          email: nextEmail
+        }
+      });
+
+      if (emailError) {
+        alert("Ошибка обновления Email: " + emailError.message);
+        return;
+      }
+    }
+
     const updates = { 
+      email: nextEmail,
       name: profileName, 
       phone: profilePhone, 
       telegram: profileTelegram, 
@@ -64,7 +87,7 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
       <div className="panel-content" style={{maxWidth: '500px'}}>
         <div className="detail-section">
           <div className="detail-label">Ваш Email</div>
-          <input className="edit-select" value={currentUser.email} disabled style={{opacity: 0.5}} />
+          <input className="edit-select" type="email" value={profileEmail} onChange={e=>setProfileEmail(e.target.value)} placeholder="name@example.com" />
         </div>
         <div className="detail-section">
           <div className="detail-label">ФИО</div>

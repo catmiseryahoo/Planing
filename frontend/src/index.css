@@ -132,11 +132,9 @@ body {
 }
 .messenger-popover {
   position: fixed;
-  top: 5.25rem;
-  right: 2rem;
   z-index: 320;
-  width: min(420px, calc(100vw - 2rem));
-  height: min(620px, calc(100vh - 7rem));
+  min-width: 520px;
+  min-height: 420px;
   overflow: hidden;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42), var(--shadow-lg);
 }
@@ -147,6 +145,8 @@ body {
   gap: 1rem;
   padding: 1rem;
   border-bottom: 1px solid var(--panel-border);
+  cursor: move;
+  user-select: none;
 }
 .messenger-header h3 {
   font-size: 1rem;
@@ -158,50 +158,126 @@ body {
   color: var(--text-secondary);
   font-size: 0.78rem;
 }
-.messenger-recipient-panel {
+.messenger-layout {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  gap: 0.55rem;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--panel-border);
-  background: rgba(255, 255, 255, 0.025);
+  grid-template-columns: minmax(210px, 34%) minmax(280px, 1fr);
 }
-.messenger-recipient-title {
+.messenger-sidebar {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border-right: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+}
+.messenger-sidebar-title {
   color: var(--text-secondary);
   font-size: 0.74rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-.messenger-recipient-list {
-  display: flex;
-  gap: 0.45rem;
-  overflow-x: auto;
-  padding-bottom: 0.15rem;
+.messenger-sidebar-title.muted {
+  margin-top: 0.35rem;
 }
-.messenger-recipient-chip {
-  flex-shrink: 0;
-  max-width: 180px;
-  padding: 0.45rem 0.7rem;
+.messenger-user-list {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow-y: auto;
+}
+.messenger-dialog-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.55rem;
   border: 1px solid var(--panel-border);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.045);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
+  text-align: left;
   cursor: pointer;
+}
+.messenger-dialog-item:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.075);
+}
+.messenger-dialog-item.active {
+  color: #bbf7d0;
+  border-color: rgba(34, 197, 94, 0.38);
+  background: rgba(34, 197, 94, 0.14);
+}
+.messenger-dialog-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.messenger-dialog-avatar {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 800;
+  background: var(--accent-color);
+}
+.messenger-dialog-avatar.project-chat {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(59, 130, 246, 0.95));
+}
+.messenger-dialog-info {
+  min-width: 0;
+}
+.messenger-dialog-info strong,
+.messenger-dialog-info span {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.messenger-recipient-chip:hover {
+.messenger-dialog-info strong {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.075);
+  font-size: 0.84rem;
 }
-.messenger-recipient-chip.active {
-  color: #bbf7d0;
-  border-color: rgba(34, 197, 94, 0.38);
-  background: rgba(34, 197, 94, 0.14);
+.messenger-dialog-info span {
+  margin-top: 0.1rem;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+.messenger-chat {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.messenger-chat-title {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+.messenger-chat-title strong,
+.messenger-chat-title span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.messenger-chat-title strong {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+}
+.messenger-chat-title span {
+  margin-top: 0.1rem;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
 }
 .messenger-messages {
   flex: 1;
@@ -297,6 +373,37 @@ body {
 .messenger-form .btn {
   align-self: end;
   min-height: 44px;
+}
+.messenger-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  cursor: nwse-resize;
+}
+.messenger-resize-handle span,
+.messenger-resize-handle::before,
+.messenger-resize-handle::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.8);
+  transform: rotate(-45deg);
+}
+.messenger-resize-handle::before {
+  right: 5px;
+  bottom: 9px;
+}
+.messenger-resize-handle::after {
+  right: 9px;
+  bottom: 5px;
 }
 
 .main-area {
