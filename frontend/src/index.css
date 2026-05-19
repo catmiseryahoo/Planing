@@ -137,6 +137,16 @@ body {
   background: rgba(2, 6, 23, 0.38);
   backdrop-filter: blur(1.5px);
 }
+.messenger-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: none;
+}
+.messenger-layer .messenger-backdrop,
+.messenger-layer .messenger-popover {
+  pointer-events: auto;
+}
 .messenger-popover {
   position: fixed;
   z-index: 320;

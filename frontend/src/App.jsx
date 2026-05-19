@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, LazyMotion, domAnimation, m, useReducedMotion } from 'motion/react';
 import { supabase } from './supabaseClient';
 import AuthScreen from './components/Auth/AuthScreen';
 import ProfilePanel from './components/Profile/ProfilePanel';
@@ -195,6 +196,7 @@ const ProjectMemberIcon = ({ type }) => {
 };
 
 function App() {
+  const shouldReduceMotion = useReducedMotion();
   const [session, setSession] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
@@ -506,12 +508,17 @@ function App() {
     }
     return isSameParticipantSet(getMessageParticipants(message), conversationParticipantIds);
   });
-  const toggleMessengerRecipient = (userId) => {
-    setSelectedMessengerUserIds(currentIds =>
+  const handleMessengerRecipientSelect = (userId, isGroupSelect = false) => {
+    if (!isGroupSelect) {
+      setSelectedMessengerUserIds([userId]);
+      return;
+    }
+
+    setSelectedMessengerUserIds(currentIds => (
       currentIds.includes(userId)
         ? currentIds.filter(id => id !== userId)
         : [...currentIds, userId]
-    );
+    ));
   };
   const handleMessengerDragStart = (e) => {
     if (e.target.closest('button')) return;
@@ -942,6 +949,7 @@ function App() {
   };
 
   return (
+    <LazyMotion features={domAnimation}>
     <div className="app-container">
       <header className="topbar">
         <div className="brand" onClick={() => setActiveView('map')} style={{cursor:'pointer'}}>Orbite Planing</div>
@@ -994,12 +1002,23 @@ function App() {
         </div>
       </header>
 
-      {isMessengerOpen && (
-        <>
-          <div className="messenger-backdrop" onClick={() => setIsMessengerOpen(false)} />
-          <div
+      <AnimatePresence>
+        {isMessengerOpen && (
+        <m.div
+          className="messenger-layer"
+          initial={shouldReduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
+          <m.div className="messenger-backdrop" onClick={() => setIsMessengerOpen(false)} />
+          <m.div
             className="messenger-popover glass-panel"
             style={{ left: messengerWindow.x, top: messengerWindow.y }}
+            initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.96, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.98, y: -6 }}
+            transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.7 }}
           >
           <div className="messenger-header" onMouseDown={handleMessengerDragStart}>
             <div>
@@ -1031,7 +1050,7 @@ function App() {
                   key={user.id}
                   type="button"
                   className={`messenger-dialog-item ${selectedMessengerUserIds.includes(user.id) ? 'active' : ''}`}
-                  onClick={() => toggleMessengerRecipient(user.id)}
+                  onClick={(e) => handleMessengerRecipientSelect(user.id, e.shiftKey)}
                   title={user.email}
                 >
                   <div className="messenger-dialog-avatar" style={{backgroundColor: user.avatar_color || '#3b82f6', backgroundImage: user.avatar_url ? `url(${user.avatar_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}}>
@@ -1105,9 +1124,10 @@ function App() {
           <button className="messenger-resize-handle" title="Изменить размер" onMouseDown={handleMessengerResizeStart}>
             <span></span>
           </button>
-          </div>
-        </>
-      )}
+          </m.div>
+        </m.div>
+        )}
+      </AnimatePresence>
 
       <div className="main-area">
         {activeView === 'map' && (
@@ -1528,9 +1548,13 @@ function App() {
                             {stageTasks.map(task => {
                               const assignee = getUser(task.assignee_id);
                               return (
-                                <div
+                                <m.div
                                   key={task.id}
                                   className="task-card"
+                                  layout={!shouldReduceMotion}
+                                  initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ type: 'spring', stiffness: 420, damping: 34 }}
                                   style={{ '--task-stage-color': stage.color || '#3b82f6' }}
                                   onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}
                                 >
@@ -1597,7 +1621,7 @@ function App() {
                                       {assignee && <div className="avatar sm" title={assignee.name || assignee.email} style={{backgroundColor: assignee.avatar_color}}>{getUserInitials(assignee.name || assignee.email)}</div>}
                                     </div>
                                   </div>
-                                </div>
+                                </m.div>
                               );
                             })}
                           </div>
@@ -1848,8 +1872,16 @@ function App() {
           )}
         </main>
 
+        <AnimatePresence>
         {(selectedTask && activeView === 'map') && (
-           <div style={{ position: 'absolute', left: panelPos.x, top: panelPos.y, zIndex: 100, display: 'flex' }}>
+           <m.div
+             key={selectedTask.id}
+             initial={shouldReduceMotion ? false : { opacity: 0, x: 18, scale: 0.98 }}
+             animate={{ opacity: 1, x: 0, scale: 1 }}
+             exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: 14, scale: 0.98 }}
+             transition={{ type: 'spring', stiffness: 460, damping: 36 }}
+             style={{ position: 'absolute', left: panelPos.x, top: panelPos.y, zIndex: 100, display: 'flex' }}
+           >
               <TaskSidebar 
                 taskId={selectedTask.id} 
                 onClose={() => setSelectedTaskId(null)} 
@@ -1896,10 +1928,12 @@ function App() {
                 }}
                 onDragStart={handlePanelDragStart}
               />
-           </div>
+           </m.div>
         )}
+        </AnimatePresence>
       </div>
     </div>
+    </LazyMotion>
   );
 }
 
