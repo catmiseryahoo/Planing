@@ -1020,10 +1020,12 @@ function App() {
       </header>
 
       {isMessengerOpen && (
-        <div
-          className="messenger-popover glass-panel"
-          style={{ left: messengerWindow.x, top: messengerWindow.y }}
-        >
+        <>
+          <div className="messenger-backdrop" onClick={() => setIsMessengerOpen(false)} />
+          <div
+            className="messenger-popover glass-panel"
+            style={{ left: messengerWindow.x, top: messengerWindow.y }}
+          >
           <div className="messenger-header" onMouseDown={handleMessengerDragStart}>
             <div>
               <h3>Мессенджер</h3>
@@ -1128,7 +1130,8 @@ function App() {
           <button className="messenger-resize-handle" title="Изменить размер" onMouseDown={handleMessengerResizeStart}>
             <span></span>
           </button>
-        </div>
+          </div>
+        </>
       )}
 
       <div className="main-area">
