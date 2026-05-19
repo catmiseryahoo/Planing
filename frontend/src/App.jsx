@@ -234,6 +234,7 @@ function App() {
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingProjectName, setEditingProjectName] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [descriptionTaskId, setDescriptionTaskId] = useState(null);
   const [draggedStageId, setDraggedStageId] = useState(null);
 
   const [panelPos, setPanelPos] = useState({ x: window.innerWidth - 420, y: 80 });
@@ -256,6 +257,7 @@ function App() {
   const messengerTextareaRef = useRef(null);
   const latestMessageAtRef = useRef('');
   const skipProjectNameSaveRef = useRef(false);
+  const taskDescriptionTimerRef = useRef(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -363,6 +365,12 @@ function App() {
       messengerEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [siteMessages, isMessengerOpen]);
+
+  useEffect(() => () => {
+    if (taskDescriptionTimerRef.current) {
+      window.clearTimeout(taskDescriptionTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isDraggingMessenger && !isResizingMessenger) return undefined;
@@ -608,7 +616,28 @@ function App() {
   };
 
   const handleSelectTask = (task) => {
+    setDescriptionTaskId(null);
     setSelectedTaskId(task.id);
+  };
+
+  const handleTaskDescriptionHoverStart = (task) => {
+    if (taskDescriptionTimerRef.current) {
+      window.clearTimeout(taskDescriptionTimerRef.current);
+    }
+    setDescriptionTaskId(null);
+    if (!task.desc?.trim()) return;
+
+    taskDescriptionTimerRef.current = window.setTimeout(() => {
+      setDescriptionTaskId(task.id);
+    }, 2400);
+  };
+
+  const handleTaskDescriptionHoverEnd = () => {
+    if (taskDescriptionTimerRef.current) {
+      window.clearTimeout(taskDescriptionTimerRef.current);
+      taskDescriptionTimerRef.current = null;
+    }
+    setDescriptionTaskId(null);
   };
 
   const handleMapBackgroundClick = () => {
@@ -1556,6 +1585,10 @@ function App() {
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ type: 'spring', stiffness: 420, damping: 34 }}
                                   style={{ '--task-stage-color': stage.color || '#3b82f6' }}
+                                  onMouseEnter={() => handleTaskDescriptionHoverStart(task)}
+                                  onMouseLeave={handleTaskDescriptionHoverEnd}
+                                  onFocus={() => handleTaskDescriptionHoverStart(task)}
+                                  onBlur={handleTaskDescriptionHoverEnd}
                                   onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}
                                 >
                                   {task.is_modified && <div className="modified-indicator" title="В задаче были изменения"></div>}
@@ -1621,6 +1654,19 @@ function App() {
                                       {assignee && <div className="avatar sm" title={assignee.name || assignee.email} style={{backgroundColor: assignee.avatar_color}}>{getUserInitials(assignee.name || assignee.email)}</div>}
                                     </div>
                                   </div>
+                                  <AnimatePresence>
+                                    {descriptionTaskId === task.id && (
+                                      <m.div
+                                        className="task-description-tooltip"
+                                        initial={shouldReduceMotion ? false : { opacity: 0, y: 6, scale: 0.98 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.98 }}
+                                        transition={{ duration: 0.18, ease: 'easeOut' }}
+                                      >
+                                        {task.desc.trim()}
+                                      </m.div>
+                                    )}
+                                  </AnimatePresence>
                                 </m.div>
                               );
                             })}

@@ -973,6 +973,36 @@ body {
   line-height: 1.4;
   color: var(--text-primary);
 }
+.task-description-tooltip {
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(100% + 0.55rem);
+  z-index: 12;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.96);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.task-description-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 1rem;
+  top: 100%;
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid rgba(148, 163, 184, 0.32);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.32);
+  background: rgba(15, 23, 42, 0.96);
+  transform: translateY(-5px) rotate(45deg);
+}
 .task-indicators {
   display: flex;
   align-items: center;
