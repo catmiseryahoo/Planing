@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../supabaseClient';
 
 export default function ProfilePanel({ currentUser, users, setUsers, setCurrentUser }) {
@@ -10,15 +10,19 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
   const [profileAvatarUrl, setProfileAvatarUrl] = useState(currentUser.avatar_url || '');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [profileUserId, setProfileUserId] = useState(currentUser.id);
 
-  useEffect(() => {
+  if (profileUserId !== currentUser.id) {
+    setProfileUserId(currentUser.id);
     setProfileEmail(currentUser.email || '');
     setProfileName(currentUser.name || '');
     setProfilePhone(currentUser.phone || '');
     setProfileTelegram(currentUser.telegram || '');
     setProfileAvatarColor(currentUser.avatar_color || '#3b82f6');
     setProfileAvatarUrl(currentUser.avatar_url || '');
-  }, [currentUser]);
+    setNewPassword('');
+    setNewPasswordConfirm('');
+  }
 
   const getUserInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '?';
 

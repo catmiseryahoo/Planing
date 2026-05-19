@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import DatePicker from '../UI/DatePicker';
 
@@ -31,13 +31,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
   const [isDragOverFiles, setIsDragOverFiles] = useState(false);
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    if (taskId) {
-      loadTaskData(taskId);
-    }
-  }, [taskId]);
-
-  const loadTaskData = async (id) => {
+  const loadTaskData = useCallback(async (id) => {
     setIsLoading(true);
     const [taskRes, subtasksRes, commentsRes, filesRes] = await Promise.all([
       supabase.from('tasks').select('*').eq('id', id).single(),
@@ -59,7 +53,13 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     if (filesRes.data) setFiles(filesRes.data);
     
     setIsLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!taskId) return undefined;
+    const timeoutId = window.setTimeout(() => loadTaskData(taskId), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [loadTaskData, taskId]);
 
   const getUserName = (userId) => {
     if (!userId) return 'Не назначен';

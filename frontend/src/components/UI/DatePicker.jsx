@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
@@ -8,6 +8,7 @@ export default function DatePicker({ value, onChange, popupAlign = 'left' }) {
   const [viewDate, setViewDate] = useState(() => {
     return value ? new Date(value + 'T00:00:00') : new Date();
   });
+  const [lastValue, setLastValue] = useState(value);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -20,9 +21,10 @@ export default function DatePicker({ value, onChange, popupAlign = 'left' }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
+  if (value !== lastValue) {
+    setLastValue(value);
     if (value) setViewDate(new Date(value + 'T00:00:00'));
-  }, [value]);
+  }
 
   const selectedDate = value ? new Date(value + 'T00:00:00') : null;
   const today = new Date();

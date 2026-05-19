@@ -501,10 +501,15 @@ body {
   justify-content: space-between;
   align-items: center;
 }
+.sidebar-left > .panel-header,
+.main-content > .project-main-header {
+  min-height: 88px;
+}
 .panel-header h2 {
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--text-primary);
+  line-height: 1.25;
 }
 
 /* Content Areas */
@@ -722,11 +727,68 @@ body {
   box-shadow: var(--shadow-sm);
 }
 .project-name {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: block;
+  padding: 0;
+  text-align: left;
+  font: inherit;
   font-weight: 500;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: inherit;
+}
+.project-name.editable {
+  cursor: text;
+}
+.project-name.editable:hover,
+.project-header-title.editable:hover {
+  color: var(--accent-hover);
+}
+.project-header-title {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: block;
+  max-width: min(420px, 42vw);
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+  cursor: inherit;
+}
+.project-header-title.editable {
+  cursor: text;
+}
+.project-name-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(96, 165, 250, 0.48);
+  border-radius: 0.45rem;
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--text-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+.project-name-input.compact {
+  height: 28px;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.project-name-input.header {
+  width: min(420px, 42vw);
+  height: 40px;
+  padding: 0.35rem 0.6rem;
+  font-size: 1.125rem;
+  font-weight: 600;
 }
 .project-meta {
   font-size: 0.75rem;
@@ -789,6 +851,13 @@ body {
 .project-delete-btn {
   padding: 2px;
   color: var(--status-overdue-text);
+}
+.project-edit-btn {
+  padding: 2px;
+  color: var(--text-secondary);
+}
+.project-edit-btn:hover {
+  color: var(--accent-hover);
 }
 .project-main-header h2 {
   min-width: 0;

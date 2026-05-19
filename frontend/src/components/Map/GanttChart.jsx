@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import './GanttChart.css';
 
 export default function GanttChart({ tasks, stages, onSelectTask }) {

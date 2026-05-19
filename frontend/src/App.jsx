@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabaseClient';
 import AuthScreen from './components/Auth/AuthScreen';
 import ProfilePanel from './components/Profile/ProfilePanel';
@@ -229,22 +229,14 @@ function App() {
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [activeView, setActiveView] = useState('map'); // map, profile, admin
   const [activeProjectView, setActiveProjectView] = useState('kanban'); // kanban, gantt
+  const [editingProjectId, setEditingProjectId] = useState(null);
+  const [editingProjectName, setEditingProjectName] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [draggedStageId, setDraggedStageId] = useState(null);
 
   const [panelPos, setPanelPos] = useState({ x: window.innerWidth - 420, y: 80 });
   const [isDraggingPanel, setIsDraggingPanel] = useState(false);
   const [panelDragOffset, setPanelDragOffset] = useState({ x: 0, y: 0 });
-
-  const [editName, setEditName] = useState('');
-  const [editStatus, setEditStatus] = useState('');
-  const [editAssigneeId, setEditAssigneeId] = useState('');
-  const [editDate, setEditDate] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editChecklist, setEditChecklist] = useState([]);
-  const [editAttachments, setEditAttachments] = useState([]);
-  const [newChecklistItemText, setNewChecklistItemText] = useState('');
-  const [commentText, setCommentText] = useState('');
 
   // Admin Create User states
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -258,11 +250,10 @@ function App() {
   const [adminEditPassword, setAdminEditPassword] = useState('');
   const [adminEditPasswordConfirm, setAdminEditPasswordConfirm] = useState('');
 
-  const [isDragOverDropZone, setIsDragOverDropZone] = useState(false);
-  const fileInputRef = useRef(null);
   const messengerEndRef = useRef(null);
   const messengerTextareaRef = useRef(null);
   const latestMessageAtRef = useRef('');
+  const skipProjectNameSaveRef = useRef(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -277,11 +268,8 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (session) fetchData();
-  }, [session]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!session) return;
     setIsDataLoading(true);
     try {
       const [projectsRes, stagesRes, tasksRes, profilesRes, subtasksRes, commentsRes, filesRes, membersRes, logsRes, messagesRes] = await Promise.all([
@@ -317,9 +305,7 @@ function App() {
       setSiteMessages(messagesRes.data || []);
       latestMessageAtRef.current = messagesRes.data?.at(-1)?.created_at || '';
 
-      if (projectsRes.data?.length > 0 && !activeProjectId) {
-        setActiveProjectId(projectsRes.data[0].id);
-      }
+      setActiveProjectId(currentId => currentId || projectsRes.data?.[0]?.id || null);
 
       const me = profilesRes.data?.find(u => u.id === session.user.id);
       if (me) {
@@ -330,9 +316,16 @@ function App() {
     } finally {
       setIsDataLoading(false);
     }
-  };
+  }, [session]);
 
-  const fetchSiteMessages = async () => {
+  useEffect(() => {
+    if (!session) return undefined;
+    const timeoutId = window.setTimeout(fetchData, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchData, session]);
+
+  const fetchSiteMessages = useCallback(async () => {
+    if (!currentUser?.id) return;
     const { data, error } = await supabase
       .from('site_messages')
       .select('*')
@@ -351,18 +344,20 @@ function App() {
       latestMessageAtRef.current = data?.at(-1)?.created_at || latestSeenAt;
       setSiteMessages(data || []);
     }
-  };
+  }, [currentUser?.id, isMessengerOpen]);
 
   useEffect(() => {
     if (!session || !currentUser) return undefined;
-    fetchSiteMessages();
+    const timeoutId = window.setTimeout(fetchSiteMessages, 0);
     const intervalId = window.setInterval(fetchSiteMessages, 5000);
-    return () => window.clearInterval(intervalId);
-  }, [session, currentUser?.id, isMessengerOpen]);
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, [session, currentUser, fetchSiteMessages]);
 
   useEffect(() => {
     if (isMessengerOpen) {
-      setHasUnreadMessages(false);
       messengerEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [siteMessages, isMessengerOpen]);
@@ -456,14 +451,6 @@ function App() {
     fetchData();
   };
 
-  const handleRoleChange = async (userId, newRole) => {
-    if (currentUser?.role !== 'Администратор') return;
-    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
-    if (!error) {
-      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
-    }
-  };
-
   if (isLoadingAuth) return <div style={{padding:'2rem', color:'var(--text-primary)'}}>Загрузка авторизации...</div>;
 
   if (!session) {
@@ -485,6 +472,11 @@ function App() {
   const activeProjectLogs = projectLogs.filter(log => log.project_id === activeProjectId);
   const isProjectLead = activeProjectMembers.some(member => member.user_id === currentUser.id && member.role === 'Руководитель проекта');
   const canManageProjectMembers = currentUser.role === 'Администратор' || isProjectLead;
+  const canRenameProject = (projectId) => currentUser?.role === 'Администратор' || projectMembers.some(member =>
+    member.project_id === projectId &&
+    member.user_id === currentUser?.id &&
+    member.role === 'Руководитель проекта'
+  );
   
   const getUserInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '?';
   const getUser = (id) => users.find(u => u.id === id);
@@ -610,31 +602,10 @@ function App() {
 
   const handleSelectTask = (task) => {
     setSelectedTaskId(task.id);
-    setEditName(task.name || '');
-    setEditStatus(task.status || 'planned');
-    setEditAssigneeId(task.assignee_id || '');
-    setEditDate(task.date || '');
-    setEditDesc(task.desc || '');
-    setEditChecklist(task.checklist ? JSON.parse(JSON.stringify(task.checklist)) : []);
-    setEditAttachments(task.attachments ? JSON.parse(JSON.stringify(task.attachments)) : []);
-    setNewChecklistItemText('');
-    setCommentText('');
-    setIsDragOverDropZone(false);
-  };
-
-  const hasTaskChanges = () => {
-    if (!selectedTask) return false;
-    return editName !== (selectedTask.name || '') ||
-           editStatus !== (selectedTask.status || 'planned') ||
-           editAssigneeId !== (selectedTask.assignee_id || '') ||
-           editDate !== (selectedTask.date || '') ||
-           editDesc !== (selectedTask.desc || '') ||
-           JSON.stringify(editChecklist) !== JSON.stringify(selectedTask.checklist || []) ||
-           JSON.stringify(editAttachments) !== JSON.stringify(selectedTask.attachments || []);
   };
 
   const handleMapBackgroundClick = () => {
-    if (selectedTaskId && !hasTaskChanges()) {
+    if (selectedTaskId) {
       setSelectedTaskId(null);
     }
   };
@@ -769,6 +740,59 @@ function App() {
       entityId: project.id,
       entityName: project.name,
       details: { changes: [{ field: 'color', label: 'Цвет проекта', from: previousColor, to: color }] }
+    });
+  };
+
+  const startProjectNameEdit = (project) => {
+    if (!project || !canRenameProject(project.id)) return;
+    skipProjectNameSaveRef.current = false;
+    setEditingProjectId(project.id);
+    setEditingProjectName(project.name || '');
+  };
+
+  const cancelProjectNameEdit = () => {
+    skipProjectNameSaveRef.current = true;
+    setEditingProjectId(null);
+    setEditingProjectName('');
+  };
+
+  const saveProjectNameEdit = async (project) => {
+    if (skipProjectNameSaveRef.current) {
+      skipProjectNameSaveRef.current = false;
+      return;
+    }
+    if (!project || editingProjectId !== project.id) return;
+    if (!canRenameProject(project.id)) {
+      cancelProjectNameEdit();
+      return;
+    }
+
+    const nextName = editingProjectName.trim();
+    const previousName = project.name || '';
+    if (!nextName) {
+      setEditingProjectName(previousName);
+      return;
+    }
+
+    cancelProjectNameEdit();
+    if (nextName === previousName) return;
+
+    setProjects(projects.map(item => item.id === project.id ? { ...item, name: nextName } : item));
+
+    const { error } = await supabase.from('projects').update({ name: nextName }).eq('id', project.id);
+    if (error) {
+      setProjects(projects);
+      alert('Ошибка изменения названия проекта: ' + error.message);
+      return;
+    }
+
+    appendProjectLog({
+      projectId: project.id,
+      action: 'update_project',
+      entityType: 'project',
+      entityId: project.id,
+      entityName: nextName,
+      details: { changes: [{ field: 'name', label: 'Название проекта', from: previousName, to: nextName }] }
     });
   };
 
@@ -917,59 +941,6 @@ function App() {
     await supabase.from('stages').upsert(updates);
   };
 
-  const handleAddChecklistItem = () => {
-    if (!newChecklistItemText.trim()) return;
-    setEditChecklist([...editChecklist, { text: newChecklistItemText.trim(), done: false }]);
-    setNewChecklistItemText('');
-  };
-  const handleToggleChecklistItem = (i) => setEditChecklist(editChecklist.map((c, idx) => idx === i ? {...c, done: !c.done} : c));
-  const handleDeleteChecklistItem = (i) => setEditChecklist(editChecklist.filter((_, idx) => idx !== i));
-  const handleFileDrop = (e) => { e.preventDefault(); setIsDragOverDropZone(false); if (e.dataTransfer.files) handleFiles(e.dataTransfer.files); };
-  const handleFileInput = (e) => { if (e.target.files) handleFiles(e.target.files); };
-  const handleFiles = (files) => {
-    const newAttachments = Array.from(files).map(file => {
-      let ext = file.name.split('.').pop().toUpperCase();
-      let previewUrl = null;
-      if (file.type.startsWith('image/')) {
-        previewUrl = URL.createObjectURL(file);
-      }
-      return { 
-        id: `att_${Date.now()}_${Math.random()}`, 
-        name: file.name, 
-        size: file.size < 1024*1024 ? (file.size/1024).toFixed(1)+' KB' : (file.size/(1024*1024)).toFixed(1)+' MB', 
-        ext: ext.substring(0,3),
-        previewUrl
-      };
-    });
-    setEditAttachments([...editAttachments, ...newAttachments]);
-  };
-  const handleDeleteAttachment = (id) => setEditAttachments(editAttachments.filter(a => a.id !== id));
-
-  const handleUpdateTask = async () => {
-    if (!selectedTask) return;
-    let newFeedItems = [];
-    if (editName !== selectedTask.name) newFeedItems.push({ id: Date.now(), type: 'history', authorId: currentUser.id, text: `Изменил(а) название`, date: 'Только что' });
-    if (editStatus !== selectedTask.status) newFeedItems.push({ id: Date.now()+1, type: 'history', authorId: currentUser.id, text: `Изменил(а) статус на ${statusLabels[editStatus]}`, date: 'Только что' });
-    if (editAssigneeId !== (selectedTask.assignee_id || '')) newFeedItems.push({ id: Date.now()+2, type: 'history', authorId: currentUser.id, text: `Изменил(а) ответственного`, date: 'Только что' });
-    if (editDate !== (selectedTask.date || '')) newFeedItems.push({ id: Date.now()+3, type: 'history', authorId: currentUser.id, text: `Изменил(а) срок`, date: 'Только что' });
-    
-    const updatedFeed = [...(selectedTask.feed || []), ...newFeedItems];
-    const updates = { name: editName, status: editStatus, assignee_id: editAssigneeId || null, date: editDate || null, desc: editDesc, checklist: editChecklist, attachments: editAttachments, is_modified: true, feed: updatedFeed };
-    
-    await supabase.from('tasks').update(updates).eq('id', selectedTask.id);
-    setTasks(tasks.map(t => t.id === selectedTask.id ? { ...t, ...updates } : t));
-    setSelectedTaskId(null);
-  };
-
-  const handleAddComment = async () => {
-    if (!commentText.trim() || !selectedTask) return;
-    const newComment = { id: Date.now(), type: 'comment', authorId: currentUser.id, text: commentText.trim(), date: 'Только что' };
-    const updatedFeed = [...(selectedTask.feed || []), newComment];
-    await supabase.from('tasks').update({ feed: updatedFeed }).eq('id', selectedTask.id);
-    setTasks(tasks.map(t => t.id === selectedTask.id ? { ...t, feed: updatedFeed } : t));
-    setCommentText('');
-  };
-
   return (
     <div className="app-container">
       <header className="topbar">
@@ -989,7 +960,11 @@ function App() {
           <button
             className={`btn btn-icon messenger-trigger ${isMessengerOpen ? 'active' : ''} ${hasUnreadMessages ? 'unread' : ''}`}
             title="Мессенджер"
-            onClick={() => setIsMessengerOpen(!isMessengerOpen)}
+            onClick={() => {
+              const nextOpenState = !isMessengerOpen;
+              setIsMessengerOpen(nextOpenState);
+              if (nextOpenState) setHasUnreadMessages(false);
+            }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
@@ -1146,6 +1121,8 @@ function App() {
                 {projects.map(project => {
                   const projectTasks = tasks.filter(t => stages.some(s => s.project_id === project.id && s.id === t.stage_id));
                   const overdueCount = projectTasks.filter(t => t.status === 'overdue').length;
+                  const isEditingProjectName = editingProjectId === project.id;
+                  const canEditProjectName = canRenameProject(project.id);
                   return (
                     <div
                       key={project.id}
@@ -1160,9 +1137,40 @@ function App() {
                       )}
                       <div className="project-item-top">
                         <div className="project-title-group">
-                          <div className="project-name">{project.name}</div>
+                          {isEditingProjectName ? (
+                            <input
+                              className="project-name-input compact"
+                              value={editingProjectName}
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => setEditingProjectName(e.target.value)}
+                              onBlur={() => saveProjectNameEdit(project)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.currentTarget.blur();
+                                if (e.key === 'Escape') cancelProjectNameEdit();
+                              }}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              className={`project-name ${canEditProjectName ? 'editable' : ''}`}
+                              onClick={(e) => {
+                                if (!canEditProjectName) return;
+                                e.stopPropagation();
+                                startProjectNameEdit(project);
+                              }}
+                              title={canEditProjectName ? 'Изменить название проекта' : project.name}
+                            >
+                              {project.name}
+                            </button>
+                          )}
                         </div>
                         <div className="project-actions" onClick={(e) => e.stopPropagation()}>
+                          {canEditProjectName && !isEditingProjectName && (
+                            <button className="btn btn-icon project-edit-btn" title="Переименовать проект" onClick={() => startProjectNameEdit(project)}>
+                              ✎
+                            </button>
+                          )}
                           {currentUser?.role === 'Администратор' && (
                              <button className="btn btn-icon project-delete-btn" title="Удалить проект" onClick={() => handleDeleteProject(project.id)}>✕</button>
                           )}
@@ -1409,9 +1417,38 @@ function App() {
           {activeView === 'map' && (
             <>
               <div className="panel-header project-main-header" style={{ '--project-color': activeProject?.color || '#3b82f6' }}>
-                <h2>
-                  {activeProject?.name || 'Выберите проект'}
-                </h2>
+                {activeProject && editingProjectId === activeProject.id ? (
+                  <input
+                    className="project-name-input header"
+                    value={editingProjectName}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setEditingProjectName(e.target.value)}
+                    onBlur={() => saveProjectNameEdit(activeProject)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.currentTarget.blur();
+                      if (e.key === 'Escape') cancelProjectNameEdit();
+                    }}
+                  />
+                ) : (
+                  <h2>
+                    {activeProject && canRenameProject(activeProject.id) ? (
+                      <button
+                        type="button"
+                        className="project-header-title editable"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startProjectNameEdit(activeProject);
+                        }}
+                        title="Изменить название проекта"
+                      >
+                        {activeProject.name}
+                      </button>
+                    ) : (
+                      activeProject?.name || 'Выберите проект'
+                    )}
+                  </h2>
+                )}
                 <div className="view-tabs">
                   <button className={`view-tab ${activeProjectView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveProjectView('kanban')}>Канбан (Карта)</button>
                   <button className={`view-tab ${activeProjectView === 'gantt' ? 'active' : ''}`} onClick={() => setActiveProjectView('gantt')}>Диаграмма Ганта</button>
