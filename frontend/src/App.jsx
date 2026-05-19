@@ -1528,7 +1528,12 @@ function App() {
                             {stageTasks.map(task => {
                               const assignee = getUser(task.assignee_id);
                               return (
-                                <div key={task.id} className="task-card" data-status={task.status} onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}>
+                                <div
+                                  key={task.id}
+                                  className="task-card"
+                                  style={{ '--task-stage-color': stage.color || '#3b82f6' }}
+                                  onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}
+                                >
                                   {task.is_modified && <div className="modified-indicator" title="В задаче были изменения"></div>}
                                   {currentUser?.role === 'Администратор' && (
                                     <button className="task-delete-btn" title="Удалить задачу" onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}>

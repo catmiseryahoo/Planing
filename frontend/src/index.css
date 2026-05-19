@@ -953,13 +953,8 @@ body {
   top: 0;
   bottom: 0;
   width: 4px;
-  background-color: var(--status-color, var(--text-secondary));
+  background-color: var(--task-stage-color, var(--text-secondary));
 }
-.task-card[data-status="planned"] { --status-color: var(--status-planned-text); }
-.task-card[data-status="in-progress"] { --status-color: var(--status-in-progress-text); }
-.task-card[data-status="review"] { --status-color: var(--status-review-text); }
-.task-card[data-status="done"] { --status-color: var(--status-done-text); }
-.task-card[data-status="overdue"] { --status-color: var(--status-overdue-text); }
 
 .task-title {
   font-size: 0.875rem;
