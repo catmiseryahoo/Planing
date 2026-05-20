@@ -762,6 +762,10 @@ function App() {
   const activeProjectMembers = projectMembers.filter(member => member.project_id === activeProjectId);
   const activeProjectLogs = projectLogs.filter(log => log.project_id === activeProjectId);
   const isProjectLead = activeProjectMembers.some(member => member.user_id === currentUser.id && member.role === 'Руководитель проекта');
+  const visibleProjectMembers = activeProjectMembers.filter(member => {
+    const user = users.find(item => item.id === member.user_id);
+    return isSuperAdmin || !user?.is_super_admin;
+  });
   const canManageProjectMembers = canManageOrganization || isProjectLead;
   const canRenameProject = (projectId) => canManageOrganization || projectMembers.some(member =>
     member.project_id === projectId &&
@@ -1601,29 +1605,31 @@ function App() {
               <button className="btn btn-icon" title="Создать проект" onClick={handleAddProject}>+</button>
             </div>
             <div className="panel-content">
-              <div className="organization-switcher">
-                <div className="detail-label">Организация</div>
-	                <select
-	                  className="edit-select organization-select"
-	                  value={activeOrganizationId || ''}
-	                  onChange={(e) => {
-	                    const nextOrganizationId = e.target.value || null;
-	                    const nextProject = projects.find(project => project.organization_id === nextOrganizationId);
-	                    setActiveOrganizationId(nextOrganizationId);
-	                    setActiveProjectId(nextProject?.id || null);
-	                    setSelectedTaskId(null);
-	                  }}
-	                >
-                  {organizations.map(organization => (
-                    <option key={organization.id} value={organization.id}>{organization.name}</option>
-                  ))}
-                </select>
-                {activeOrganization && (
-                  <div className="organization-switcher-meta">
-                    {organizationRoleLabels[currentOrganizationRole] || 'Участник'} · {activeOrganizationMembers.length} сотрудников
-                  </div>
-                )}
-              </div>
+              {isSuperAdmin && (
+                <div className="organization-switcher">
+                  <div className="detail-label">Организация</div>
+                  <select
+                    className="edit-select organization-select"
+                    value={activeOrganizationId || ''}
+                    onChange={(e) => {
+                      const nextOrganizationId = e.target.value || null;
+                      const nextProject = projects.find(project => project.organization_id === nextOrganizationId);
+                      setActiveOrganizationId(nextOrganizationId);
+                      setActiveProjectId(nextProject?.id || null);
+                      setSelectedTaskId(null);
+                    }}
+                  >
+                    {organizations.map(organization => (
+                      <option key={organization.id} value={organization.id}>{organization.name}</option>
+                    ))}
+                  </select>
+                  {activeOrganization && (
+                    <div className="organization-switcher-meta">
+                      {organizationRoleLabels[currentOrganizationRole] || 'Участник'} · {activeOrganizationMembers.length} сотрудников
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="project-list">
                 {visibleProjects.map(project => {
                   const projectTasks = tasks.filter(t => stages.some(s => s.project_id === project.id && s.id === t.stage_id));
@@ -2249,7 +2255,7 @@ function App() {
                       <form className="project-member-form" onSubmit={handleAddProjectMember}>
                         <select className="edit-select" value={memberUserId} onChange={(e) => setMemberUserId(e.target.value)} required>
                           <option value="">Выберите сотрудника</option>
-                          {organizationUsers.filter(user => !activeProjectMembers.some(member => member.user_id === user.id)).map(user => (
+                          {visibleOrganizationUsers.filter(user => !activeProjectMembers.some(member => member.user_id === user.id)).map(user => (
                             <option key={user.id} value={user.id}>{user.name || user.email}</option>
                           ))}
                         </select>
@@ -2261,7 +2267,7 @@ function App() {
                       </form>
                     )}
                     <div className="project-member-list">
-                      {activeProjectMembers.length > 0 ? activeProjectMembers.map(member => {
+                      {visibleProjectMembers.length > 0 ? visibleProjectMembers.map(member => {
                         const user = getUser(member.user_id);
                         const assignedTasks = projectTasks.filter(task => task.assignee_id === member.user_id);
                         const assignedCount = assignedTasks.length;
