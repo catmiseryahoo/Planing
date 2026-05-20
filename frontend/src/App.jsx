@@ -750,6 +750,8 @@ function App() {
   );
   const canManageOrganization = isSuperAdmin || ['owner', 'admin'].includes(currentOrganizationRole);
   const canCreateProjects = isSuperAdmin || ['owner', 'admin', 'project_manager'].includes(currentOrganizationRole);
+  const canManageOrganizationStaff = isSuperAdmin || ['owner', 'admin', 'project_manager'].includes(currentOrganizationRole);
+  const visibleOrganizationUsers = organizationUsers.filter(user => isSuperAdmin || !user.is_super_admin);
   const visibleProjects = projects.filter(project => project.organization_id === activeOrganizationId);
   const projectStages = stages.filter(s => s.project_id === activeProjectId).sort((a, b) => a.order - b.order);
   const projectTasks = tasks.filter(t => projectStages.some(s => s.id === t.stage_id));
@@ -775,7 +777,7 @@ function App() {
     || canManageOrganization
     || currentOrganizationRole === 'project_manager'
   );
-  const messengerUsers = organizationUsers.filter(user => user.id !== currentUser.id);
+  const messengerUsers = visibleOrganizationUsers.filter(user => user.id !== currentUser.id);
   const selectedMessengerUsers = selectedMessengerUserIds
     .map(id => getUser(id))
     .filter(Boolean);
@@ -1071,6 +1073,57 @@ function App() {
     });
   };
 
+  const canDismissOrganizationUser = (user) => {
+    const member = activeOrganizationMembers.find(item => item.user_id === user?.id);
+    return Boolean(
+      canManageOrganizationStaff
+      && member
+      && user?.id !== currentUser.id
+      && !user?.is_super_admin
+      && !['owner', 'admin'].includes(member.role)
+    );
+  };
+
+  const handleDismissOrganizationUser = async (user) => {
+    const member = activeOrganizationMembers.find(item => item.user_id === user?.id);
+    if (!member || !canDismissOrganizationUser(user)) return;
+
+    const displayName = user.name || user.email || 'сотрудника';
+    if (!window.confirm(`Уволить ${displayName} из организации "${activeOrganization?.name || 'организация'}"?`)) return;
+
+    const organizationProjectIds = visibleProjects.map(project => project.id);
+    if (organizationProjectIds.length > 0) {
+      const { error: projectMembersError } = await supabase
+        .from('project_members')
+        .delete()
+        .eq('user_id', user.id)
+        .in('project_id', organizationProjectIds);
+
+      if (projectMembersError) {
+        alert('Не удалось удалить сотрудника из проектов: ' + projectMembersError.message);
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from('organization_members')
+      .delete()
+      .eq('id', member.id);
+
+    if (error) {
+      alert('Не удалось уволить сотрудника: ' + error.message);
+      return;
+    }
+
+    setOrganizationMembers(organizationMembers.filter(item => item.id !== member.id));
+    setProjectMembers(projectMembers.filter(item => !(item.user_id === user.id && organizationProjectIds.includes(item.project_id))));
+    if (adminEditingUser?.id === user.id) {
+      setAdminEditingUser(null);
+      setAdminEditPassword('');
+      setAdminEditPasswordConfirm('');
+    }
+  };
+
   const handleDeleteProject = async (id) => {
     if (!canManageOrganization) return;
     if (!window.confirm("Удалить проект и все его задачи?")) return;
@@ -1364,7 +1417,7 @@ function App() {
             )}
           </div>
 
-          {isSuperAdmin && (
+          {canManageOrganizationStaff && (
             <button 
               className={`btn ${activeView === 'admin' ? 'active' : ''}`}
               style={{background: 'rgba(255,255,255,0.05)', border: '1px solid var(--panel-border)'}}
@@ -1658,43 +1711,46 @@ function App() {
           )}
 
           {/* ADMIN VIEW */}
-          {activeView === 'admin' && isSuperAdmin && (
+          {activeView === 'admin' && canManageOrganizationStaff && (
             <>
               <div className="panel-header"><h2>Панель администратора</h2></div>
               <div className="panel-content" style={{display: 'flex', gap: '2rem'}}>
                 
                 <div style={{flex: 2}}>
-                  <section className="admin-organization-panel">
-                    <div>
-                      <h3>Организации</h3>
-                      <p>Создайте группу и назначьте проектного менеджера, который сможет вести проекты внутри неё.</p>
-                    </div>
-                    <form className="admin-organization-form" onSubmit={handleCreateOrganization}>
-                      <input
-                        className="auth-input"
-                        style={{marginBottom: 0}}
-                        type="text"
-                        placeholder="Название организации"
-                        value={newOrganizationName}
-                        onChange={(e) => setNewOrganizationName(e.target.value)}
-                        required
-                      />
-                      <select
-                        className="edit-select"
-                        value={organizationManagerId}
-                        onChange={(e) => setOrganizationManagerId(e.target.value)}
-                      >
-                        <option value="">Проектный менеджер позже</option>
-                        {users.map(user => (
-                          <option key={user.id} value={user.id}>{user.name || user.email}</option>
-                        ))}
-                      </select>
-                      <button className="btn btn-primary" type="submit">Создать организацию</button>
-                    </form>
-                    <div className="admin-organization-list">
-                      {organizations.map(organization => {
-                        const members = organizationMembers.filter(member => member.organization_id === organization.id);
-                        const manager = members
+	                  <section className="admin-organization-panel">
+	                    <div>
+	                      <h3>Организации</h3>
+	                      <p>{isSuperAdmin ? 'Создайте группу и назначьте проектного менеджера, который сможет вести проекты внутри неё.' : 'Управляйте сотрудниками выбранной организации.'}</p>
+	                    </div>
+	                    {isSuperAdmin && (
+	                      <form className="admin-organization-form" onSubmit={handleCreateOrganization}>
+	                        <input
+	                          className="auth-input"
+	                          style={{marginBottom: 0}}
+	                          type="text"
+	                          placeholder="Название организации"
+	                          value={newOrganizationName}
+	                          onChange={(e) => setNewOrganizationName(e.target.value)}
+	                          required
+	                        />
+	                        <select
+	                          className="edit-select"
+	                          value={organizationManagerId}
+	                          onChange={(e) => setOrganizationManagerId(e.target.value)}
+	                        >
+	                          <option value="">Проектный менеджер позже</option>
+	                          {users.filter(user => !user.is_super_admin).map(user => (
+	                            <option key={user.id} value={user.id}>{user.name || user.email}</option>
+	                          ))}
+	                        </select>
+	                        <button className="btn btn-primary" type="submit">Создать организацию</button>
+	                      </form>
+	                    )}
+	                    <div className="admin-organization-list">
+	                      {organizations.map(organization => {
+	                        const organizationCardMembers = organizationMembers.filter(member => member.organization_id === organization.id);
+	                        const members = organizationCardMembers.filter(member => isSuperAdmin || !getUser(member.user_id)?.is_super_admin);
+	                        const manager = members
                           .filter(member => member.role === 'project_manager')
                           .map(member => getUser(member.user_id)?.name || getUser(member.user_id)?.email)
                           .filter(Boolean)
@@ -1727,7 +1783,7 @@ function App() {
                       <tr><th>Сотрудник</th><th>Email</th><th>Телефон</th><th>Действия</th></tr>
                     </thead>
                     <tbody>
-	                      {organizationUsers.map(u => (
+		                      {visibleOrganizationUsers.map(u => (
 	                        <tr key={u.id}>
                           <td>
                             <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
@@ -1742,16 +1798,23 @@ function App() {
                           </td>
                           <td>{u.email}</td>
                           <td>{u.phone || '—'}</td>
-                          <td>
-                            <button className="btn btn-icon" onClick={() => {
-                              setAdminEditingUser(u);
-                              setAdminEditPassword('');
-                              setAdminEditPasswordConfirm('');
-                            }} title="Редактировать">✏️</button>
-                          </td>
+	                          <td>
+	                            <div className="admin-table-actions">
+	                              {isSuperAdmin && (
+	                                <button className="btn btn-icon" onClick={() => {
+	                                  setAdminEditingUser(u);
+	                                  setAdminEditPassword('');
+	                                  setAdminEditPasswordConfirm('');
+	                                }} title="Редактировать">✏️</button>
+	                              )}
+	                              {canDismissOrganizationUser(u) && (
+	                                <button className="btn btn-icon danger" onClick={() => handleDismissOrganizationUser(u)} title="Уволить из организации">✕</button>
+	                              )}
+	                            </div>
+	                          </td>
                         </tr>
 	                      ))}
-	                      {organizationUsers.length === 0 && (
+		                      {visibleOrganizationUsers.length === 0 && (
 	                        <tr>
 	                          <td colSpan="4">
 	                            <div className="empty-state">В выбранной организации пока нет сотрудников</div>
@@ -1763,7 +1826,7 @@ function App() {
                 </div>
 
                 <div style={{flex: 1, borderLeft: '1px solid var(--panel-border)', paddingLeft: '2rem'}}>
-                  {adminEditingUser ? (
+		                  {isSuperAdmin ? (adminEditingUser ? (
                     <div>
                       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '1rem'}}>
                         <h3>Редактирование: {adminEditingUser.name}</h3>
@@ -1817,13 +1880,13 @@ function App() {
                       <div className="detail-section">
                         <div className="detail-label">Фото сотрудника</div>
                         <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
-                           {adminEditingUser.avatar_url ? (
-                              <img src={adminEditingUser.avatar_url} alt="avatar" style={{width:'48px', height:'48px', borderRadius:'50%', objectFit:'cover', border:'2px solid var(--panel-border)'}} />
-                           ) : (
-                              <div style={{width:'48px', height:'48px', borderRadius:'50%', backgroundColor: adminEditingUser.avatar_color || '#ccc', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', fontWeight:'bold', color:'white'}}>
-                                {getUserInitials(adminEditingUser.name || adminEditingUser.email)}
-                              </div>
-                           )}
+	                           {adminEditingUser.avatar_url ? (
+	                              <img src={adminEditingUser.avatar_url} alt="avatar" style={{width:'48px', height:'48px', borderRadius:'50%', objectFit:'cover', border:'2px solid var(--panel-border)'}} />
+	                           ) : (
+	                              <div style={{width:'48px', height:'48px', borderRadius:'50%', backgroundColor: adminEditingUser.avatar_color || '#ccc', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', fontWeight:'bold', color:'white'}}>
+	                                {getUserInitials(adminEditingUser.name || adminEditingUser.email)}
+	                              </div>
+	                           )}
                            <div style={{flex: 1}}>
                               <input type="file" accept="image/*" onChange={(e) => {
                                  if (e.target.files && e.target.files[0]) {
@@ -1927,7 +1990,9 @@ function App() {
                         <button className="btn btn-primary" type="submit">Создать аккаунт</button>
                       </form>
                     </div>
-                  )}
+	                  )) : (
+	                    <div className="empty-state">Выберите сотрудника слева, чтобы управлять составом организации.</div>
+	                  )}
                 </div>
                 
               </div>
