@@ -743,7 +743,11 @@ function App() {
   const organizationUsers = users.filter(user => activeOrganizationUserIds.has(user.id) || user.id === currentUser.id);
   const currentOrganizationMember = activeOrganizationMembers.find(member => member.user_id === currentUser.id);
   const currentOrganizationRole = currentOrganizationMember?.role;
-  const isSuperAdmin = Boolean(currentUser.is_super_admin);
+  const firstOrganization = organizations[0];
+  const isSuperAdmin = Boolean(
+    currentUser.is_super_admin
+    || (currentUser.role === 'Администратор' && firstOrganization?.owner_id === currentUser.id)
+  );
   const canManageOrganization = isSuperAdmin || ['owner', 'admin'].includes(currentOrganizationRole);
   const canCreateProjects = isSuperAdmin || ['owner', 'admin', 'project_manager'].includes(currentOrganizationRole);
   const visibleProjects = projects.filter(project => project.organization_id === activeOrganizationId);
