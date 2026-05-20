@@ -740,7 +740,7 @@ function App() {
   const activeOrganization = organizations.find(organization => organization.id === activeOrganizationId);
   const activeOrganizationMembers = organizationMembers.filter(member => member.organization_id === activeOrganizationId);
   const activeOrganizationUserIds = new Set(activeOrganizationMembers.map(member => member.user_id));
-  const organizationUsers = users.filter(user => activeOrganizationUserIds.has(user.id) || user.id === currentUser.id);
+  const organizationUsers = users.filter(user => activeOrganizationUserIds.has(user.id));
   const currentOrganizationMember = activeOrganizationMembers.find(member => member.user_id === currentUser.id);
   const currentOrganizationRole = currentOrganizationMember?.role;
   const firstOrganization = organizations[0];
@@ -1704,8 +1704,13 @@ function App() {
                             key={organization.id}
                             type="button"
                             className={`admin-organization-item ${organization.id === activeOrganizationId ? 'active' : ''}`}
-                            onClick={() => setActiveOrganizationId(organization.id)}
-                          >
+	                            onClick={() => {
+	                              setActiveOrganizationId(organization.id);
+	                              setAdminEditingUser(null);
+	                              setAdminEditPassword('');
+	                              setAdminEditPasswordConfirm('');
+	                            }}
+	                          >
                             <strong>{organization.name}</strong>
                             <span>{members.length} сотрудников{manager ? ` · PM: ${manager}` : ''}</span>
                           </button>
@@ -1714,14 +1719,16 @@ function App() {
                     </div>
                   </section>
 
-                  <h3 style={{marginBottom: '1rem'}}>Пользователи системы</h3>
-                  <table className="admin-table">
+	                  <h3 style={{marginBottom: '1rem'}}>
+	                    Сотрудники организации{activeOrganization ? `: ${activeOrganization.name}` : ''}
+	                  </h3>
+	                  <table className="admin-table">
                     <thead>
                       <tr><th>Сотрудник</th><th>Email</th><th>Телефон</th><th>Действия</th></tr>
                     </thead>
                     <tbody>
-                      {users.map(u => (
-                        <tr key={u.id}>
+	                      {organizationUsers.map(u => (
+	                        <tr key={u.id}>
                           <td>
                             <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
                               {u.avatar_url ? (
@@ -1743,7 +1750,14 @@ function App() {
                             }} title="Редактировать">✏️</button>
                           </td>
                         </tr>
-                      ))}
+	                      ))}
+	                      {organizationUsers.length === 0 && (
+	                        <tr>
+	                          <td colSpan="4">
+	                            <div className="empty-state">В выбранной организации пока нет сотрудников</div>
+	                          </td>
+	                        </tr>
+	                      )}
                     </tbody>
                   </table>
                 </div>
