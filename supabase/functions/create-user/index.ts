@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
 
   const { data: currentProfile, error: profileError } = await adminClient
     .from('profiles')
-    .select('role')
+    .select('is_super_admin')
     .eq('id', user.id)
     .single();
 
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     return json({ error: profileError.message }, 500);
   }
 
-  if (currentProfile?.role !== 'Администратор') {
+  if (!currentProfile?.is_super_admin) {
     return json({ error: 'Forbidden' }, 403);
   }
 

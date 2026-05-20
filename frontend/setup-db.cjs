@@ -24,6 +24,7 @@ async function run() {
         name TEXT,
         phone TEXT,
         role TEXT DEFAULT 'Сотрудник', 
+        is_super_admin BOOLEAN NOT NULL DEFAULT false,
         avatar_color TEXT DEFAULT '#3b82f6',
         avatar_url TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
@@ -53,8 +54,8 @@ async function run() {
 
     // 2. Добавляем текущих пользователей в профили
     await client.query(`
-      INSERT INTO public.profiles (id, email, role, name)
-      SELECT id, email, 'Администратор', email
+      INSERT INTO public.profiles (id, email, role, is_super_admin, name)
+      SELECT id, email, 'Администратор', true, email
       FROM auth.users
       ON CONFLICT (id) DO NOTHING;
     `);

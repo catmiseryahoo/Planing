@@ -181,7 +181,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
   };
 
   const handleDeleteTask = async () => {
-    if (!task || currentUser?.role !== 'Администратор') return;
+    if (!task || !currentUser?.is_super_admin) return;
     if (!window.confirm(`Удалить задачу "${task.name}"?`)) return;
 
     const { error } = await supabase.from('tasks').delete().eq('id', task.id);
@@ -299,7 +299,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
       <div className="panel-header" onMouseDown={onDragStart} style={{cursor: 'move'}}>
         <h2>Свойства задачи</h2>
         <div style={{display: 'flex', alignItems: 'center', gap: '0.25rem'}} onMouseDown={(e) => e.stopPropagation()}>
-          {currentUser?.role === 'Администратор' && (
+          {currentUser?.is_super_admin && (
             <button className="btn btn-icon danger" title="Удалить задачу" onClick={handleDeleteTask}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 6h18" />

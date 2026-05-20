@@ -93,6 +93,13 @@ const getInitialClockTimeZone = () => {
 
 const formatTimeZoneLabel = (timeZone) => timeZone.replace(/_/g, ' ');
 
+const organizationRoleLabels = {
+  owner: 'Владелец',
+  admin: 'Администратор',
+  project_manager: 'Проектный менеджер',
+  member: 'Участник'
+};
+
 const getClockTimeZones = () => {
   const browserTimeZone = getBrowserTimeZone();
   return Array.from(new Set([browserTimeZone, ...CLOCK_TIME_ZONES]));
@@ -286,6 +293,8 @@ function App() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   const [projects, setProjects] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
+  const [organizationMembers, setOrganizationMembers] = useState([]);
   const [stages, setStages] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
@@ -314,6 +323,7 @@ function App() {
   const [messengerResizeStart, setMessengerResizeStart] = useState(null);
 
   const [activeProjectId, setActiveProjectId] = useState(null);
+  const [activeOrganizationId, setActiveOrganizationId] = useState(null);
   const [activeView, setActiveView] = useState('map'); // map, profile, admin
   const [activeProjectView, setActiveProjectView] = useState('kanban'); // kanban, gantt
   const [editingProjectId, setEditingProjectId] = useState(null);
@@ -330,6 +340,8 @@ function App() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('Сотрудник');
+  const [newOrganizationName, setNewOrganizationName] = useState('');
+  const [organizationManagerId, setOrganizationManagerId] = useState('');
   const [memberUserId, setMemberUserId] = useState('');
   const [memberRole, setMemberRole] = useState('Участник');
   const [clockTimeZone, setClockTimeZone] = useState(getInitialClockTimeZone);
@@ -465,12 +477,24 @@ function App() {
     };
   }, []);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (preferredOrganizationId = activeOrganizationId) => {
     if (!session) return;
     setIsDataLoading(true);
     try {
-      const [projectsRes, stagesRes, tasksRes, profilesRes, subtasksRes, commentsRes, filesRes, membersRes, logsRes, messagesRes] = await Promise.all([
+      let siteMessagesQuery = supabase
+        .from('site_messages')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(200);
+
+      if (preferredOrganizationId) {
+        siteMessagesQuery = siteMessagesQuery.eq('organization_id', preferredOrganizationId);
+      }
+
+      const [projectsRes, organizationsRes, organizationMembersRes, stagesRes, tasksRes, profilesRes, subtasksRes, commentsRes, filesRes, membersRes, logsRes, messagesRes] = await Promise.all([
         supabase.from('projects').select('*').order('created_at', { ascending: true }),
+        supabase.from('organizations').select('*').order('created_at', { ascending: true }),
+        supabase.from('organization_members').select('*'),
         supabase.from('stages').select('*').order('order', { ascending: true }),
         supabase.from('tasks').select('*'),
         supabase.from('profiles').select('*'),
@@ -479,7 +503,7 @@ function App() {
         supabase.from('task_files').select('*').order('created_at', { ascending: false }),
         supabase.from('project_members').select('*'),
         supabase.from('project_logs').select('*').order('created_at', { ascending: false }).limit(300),
-        supabase.from('site_messages').select('*').or(`recipient_ids.cs.{${session.user.id}},author_id.eq.${session.user.id},project_id.not.is.null`).order('created_at', { ascending: true }).limit(200)
+        siteMessagesQuery
       ]);
 
       const subtaskCounts = countByTaskId(subtasksRes.data);
@@ -492,7 +516,14 @@ function App() {
         file_count: fileCounts[task.id] || 0
       }));
 
-      setProjects(projectsRes.data || []);
+      const fetchedProjects = projectsRes.data || [];
+      const fetchedOrganizations = organizationsRes.data || [];
+      const nextOrganizationId = preferredOrganizationId || fetchedOrganizations[0]?.id || null;
+      const nextOrganizationProjects = fetchedProjects.filter(project => project.organization_id === nextOrganizationId);
+
+      setProjects(fetchedProjects);
+      setOrganizations(fetchedOrganizations);
+      setOrganizationMembers(organizationMembersRes.data || []);
       setStages(stagesRes.data || []);
       setTasks(tasksWithIndicators);
       setUsers(profilesRes.data || []);
@@ -502,7 +533,12 @@ function App() {
       setSiteMessages(messagesRes.data || []);
       latestMessageAtRef.current = messagesRes.data?.at(-1)?.created_at || '';
 
-      setActiveProjectId(currentId => currentId || projectsRes.data?.[0]?.id || null);
+      setActiveOrganizationId(nextOrganizationId);
+      setActiveProjectId(currentId => (
+        nextOrganizationProjects.some(project => project.id === currentId)
+          ? currentId
+          : nextOrganizationProjects[0]?.id || null
+      ));
 
       const me = profilesRes.data?.find(u => u.id === session.user.id);
       if (me) {
@@ -513,7 +549,7 @@ function App() {
     } finally {
       setIsDataLoading(false);
     }
-  }, [session]);
+  }, [activeOrganizationId, session]);
 
   useEffect(() => {
     if (!session) return undefined;
@@ -522,11 +558,11 @@ function App() {
   }, [fetchData, session]);
 
   const fetchSiteMessages = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || !activeOrganizationId) return;
     const { data, error } = await supabase
       .from('site_messages')
       .select('*')
-      .or(`recipient_ids.cs.{${currentUser.id}},author_id.eq.${currentUser.id},project_id.not.is.null`)
+      .eq('organization_id', activeOrganizationId)
       .order('created_at', { ascending: true })
       .limit(200);
 
@@ -541,7 +577,7 @@ function App() {
       latestMessageAtRef.current = data?.at(-1)?.created_at || latestSeenAt;
       setSiteMessages(data || []);
     }
-  }, [currentUser?.id, isMessengerOpen]);
+  }, [activeOrganizationId, currentUser?.id, isMessengerOpen]);
 
   useEffect(() => {
     if (!session || !currentUser) return undefined;
@@ -659,9 +695,9 @@ function App() {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
-    if (currentUser?.role !== 'Администратор') return;
+    if (!currentUser?.is_super_admin) return;
 
-    const { error } = await supabase.functions.invoke('create-user', {
+    const { data, error } = await supabase.functions.invoke('create-user', {
       body: {
         email: newUserEmail,
         password: newUserPassword,
@@ -675,11 +711,19 @@ function App() {
       return;
     }
 
+    const createdUserId = data?.user?.id;
+    if (activeOrganizationId && createdUserId) {
+      const organizationRole = newUserRole === 'Менеджер проектов' ? 'project_manager' : 'member';
+      await supabase
+        .from('organization_members')
+        .upsert([{ organization_id: activeOrganizationId, user_id: createdUserId, role: organizationRole }], { onConflict: 'organization_id,user_id' });
+    }
+
     alert("Сотрудник успешно создан и добавлен в базу!");
     setNewUserEmail('');
     setNewUserPassword('');
     setNewUserName('');
-    fetchData();
+    fetchData(activeOrganizationId);
   };
 
   if (isLoadingAuth) return <div style={{padding:'2rem', color:'var(--text-primary)'}}>Загрузка авторизации...</div>;
@@ -693,6 +737,16 @@ function App() {
   }
 
   const activeProject = projects.find(p => p.id === activeProjectId);
+  const activeOrganization = organizations.find(organization => organization.id === activeOrganizationId);
+  const activeOrganizationMembers = organizationMembers.filter(member => member.organization_id === activeOrganizationId);
+  const activeOrganizationUserIds = new Set(activeOrganizationMembers.map(member => member.user_id));
+  const organizationUsers = users.filter(user => activeOrganizationUserIds.has(user.id) || user.id === currentUser.id);
+  const currentOrganizationMember = activeOrganizationMembers.find(member => member.user_id === currentUser.id);
+  const currentOrganizationRole = currentOrganizationMember?.role;
+  const isSuperAdmin = Boolean(currentUser.is_super_admin);
+  const canManageOrganization = isSuperAdmin || ['owner', 'admin'].includes(currentOrganizationRole);
+  const canCreateProjects = isSuperAdmin || ['owner', 'admin', 'project_manager'].includes(currentOrganizationRole);
+  const visibleProjects = projects.filter(project => project.organization_id === activeOrganizationId);
   const projectStages = stages.filter(s => s.project_id === activeProjectId).sort((a, b) => a.order - b.order);
   const projectTasks = tasks.filter(t => projectStages.some(s => s.id === t.stage_id));
   const projectMetrics = getProjectMetrics(projectStages, projectTasks);
@@ -702,8 +756,8 @@ function App() {
   const activeProjectMembers = projectMembers.filter(member => member.project_id === activeProjectId);
   const activeProjectLogs = projectLogs.filter(log => log.project_id === activeProjectId);
   const isProjectLead = activeProjectMembers.some(member => member.user_id === currentUser.id && member.role === 'Руководитель проекта');
-  const canManageProjectMembers = currentUser.role === 'Администратор' || isProjectLead;
-  const canRenameProject = (projectId) => currentUser?.role === 'Администратор' || projectMembers.some(member =>
+  const canManageProjectMembers = canManageOrganization || isProjectLead;
+  const canRenameProject = (projectId) => canManageOrganization || projectMembers.some(member =>
     member.project_id === projectId &&
     member.user_id === currentUser?.id &&
     member.role === 'Руководитель проекта'
@@ -714,10 +768,10 @@ function App() {
   const activeProjectMemberIds = new Set(activeProjectMembers.map(member => member.user_id));
   const canUseProjectChat = Boolean(activeProjectId) && (
     activeProjectMemberIds.has(currentUser.id)
-    || currentUser.role === 'Администратор'
-    || currentUser.role === 'Менеджер проектов'
+    || canManageOrganization
+    || currentOrganizationRole === 'project_manager'
   );
-  const messengerUsers = users.filter(user => user.id !== currentUser.id);
+  const messengerUsers = organizationUsers.filter(user => user.id !== currentUser.id);
   const selectedMessengerUsers = selectedMessengerUserIds
     .map(id => getUser(id))
     .filter(Boolean);
@@ -793,6 +847,10 @@ function App() {
     e.preventDefault();
     const body = messengerText.trim();
     if (!body || !currentUser?.id || isSendingMessage) return;
+    if (!activeOrganizationId) {
+      alert('Сначала выберите организацию');
+      return;
+    }
     if (selectedMessengerUserIds.length === 0 && !canUseProjectChat) {
       alert('Общий чат доступен только участникам активного проекта');
       return;
@@ -805,6 +863,7 @@ function App() {
       author_id: currentUser.id,
       recipient_ids: selectedMessengerUserIds,
       project_id: projectId,
+      organization_id: activeOrganizationId,
       body,
       created_at: new Date().toISOString(),
       isLocal: true
@@ -814,7 +873,13 @@ function App() {
 
     const { data, error } = await supabase
       .from('site_messages')
-      .insert([{ author_id: currentUser.id, recipient_ids: selectedMessengerUserIds, project_id: projectId, body }])
+      .insert([{
+        author_id: currentUser.id,
+        recipient_ids: selectedMessengerUserIds,
+        project_id: projectId,
+        organization_id: activeOrganizationId,
+        body
+      }])
       .select()
       .single();
 
@@ -846,12 +911,71 @@ function App() {
     }
   };
 
+  const handleCreateOrganization = async (e) => {
+    e.preventDefault();
+    if (!isSuperAdmin) return;
+
+    const name = newOrganizationName.trim();
+    if (!name) {
+      alert('Введите название организации');
+      return;
+    }
+
+    const { data: organizationData, error: organizationError } = await supabase
+      .from('organizations')
+      .insert([{ name, owner_id: currentUser.id }])
+      .select()
+      .single();
+
+    if (organizationError) {
+      alert('Ошибка создания организации: ' + organizationError.message);
+      return;
+    }
+
+    const organizationMemberRows = [
+      { organization_id: organizationData.id, user_id: currentUser.id, role: 'owner' }
+    ];
+
+    if (organizationManagerId && organizationManagerId !== currentUser.id) {
+      organizationMemberRows.push({
+        organization_id: organizationData.id,
+        user_id: organizationManagerId,
+        role: 'project_manager'
+      });
+    }
+
+    const { error: membersError } = await supabase
+      .from('organization_members')
+      .upsert(organizationMemberRows, { onConflict: 'organization_id,user_id' });
+
+    if (membersError) {
+      alert('Организация создана, но участники не добавлены: ' + membersError.message);
+    }
+
+    if (organizationManagerId) {
+      const manager = users.find(user => user.id === organizationManagerId);
+      if (manager && manager.role !== 'Администратор') {
+        await supabase.from('profiles').update({ role: 'Менеджер проектов' }).eq('id', organizationManagerId);
+      }
+    }
+
+    setNewOrganizationName('');
+    setOrganizationManagerId('');
+    setActiveOrganizationId(organizationData.id);
+    fetchData(organizationData.id);
+  };
+
   const handleAddProject = async () => {
-    if (currentUser.role !== 'Администратор' && currentUser.role !== 'Менеджер проектов') {
+    if (!activeOrganizationId) {
+      alert('Сначала выберите или создайте организацию');
+      return;
+    }
+
+    if (!canCreateProjects) {
       alert('У вас нет прав для создания проектов');
       return;
     }
-    const { data, error } = await supabase.from('projects').insert([{ name: 'Новый проект', status: 'В работе', color: '#3b82f6' }]).select();
+    const { data, error } = await supabase.from('projects').insert([{ name: 'Новый проект', status: 'В работе', color: '#3b82f6', organization_id: activeOrganizationId }]).select();
     if (!error && data) {
       setProjects([...projects, data[0]]);
       setActiveProjectId(data[0].id);
@@ -944,6 +1068,7 @@ function App() {
   };
 
   const handleDeleteProject = async (id) => {
+    if (!canManageOrganization) return;
     if (!window.confirm("Удалить проект и все его задачи?")) return;
     const { error } = await supabase.from('projects').delete().eq('id', id);
     if (!error) {
@@ -954,7 +1079,7 @@ function App() {
 
   const handleProjectColorChange = async (project, color) => {
     if (!project || project.color === color) return;
-    if (currentUser?.role !== 'Администратор' && currentUser?.role !== 'Менеджер проектов') {
+    if (!canCreateProjects) {
       alert('У вас нет прав для изменения проекта');
       return;
     }
@@ -1033,7 +1158,7 @@ function App() {
   };
 
   const handleDeleteStage = async (stage) => {
-    if (currentUser?.role !== 'Администратор') return;
+    if (!canManageOrganization && !isProjectLead) return;
     const stageTasks = tasks.filter(t => t.stage_id === stage.id);
     const taskText = stageTasks.length ? ` и ${stageTasks.length} задач внутри` : '';
     if (!window.confirm(`Удалить этап "${stage.name}"${taskText}?`)) return;
@@ -1059,7 +1184,7 @@ function App() {
   };
 
   const handleDeleteTask = async (task) => {
-    if (currentUser?.role !== 'Администратор') return;
+    if (!canManageOrganization && !isProjectLead) return;
     if (!window.confirm(`Удалить задачу "${task.name}"?`)) return;
 
     const { error } = await supabase.from('tasks').delete().eq('id', task.id);
@@ -1235,7 +1360,7 @@ function App() {
             )}
           </div>
 
-          {currentUser.role === 'Администратор' && (
+          {isSuperAdmin && (
             <button 
               className={`btn ${activeView === 'admin' ? 'active' : ''}`}
               style={{background: 'rgba(255,255,255,0.05)', border: '1px solid var(--panel-border)'}}
@@ -1419,8 +1544,31 @@ function App() {
               <button className="btn btn-icon" title="Создать проект" onClick={handleAddProject}>+</button>
             </div>
             <div className="panel-content">
+              <div className="organization-switcher">
+                <div className="detail-label">Организация</div>
+	                <select
+	                  className="edit-select organization-select"
+	                  value={activeOrganizationId || ''}
+	                  onChange={(e) => {
+	                    const nextOrganizationId = e.target.value || null;
+	                    const nextProject = projects.find(project => project.organization_id === nextOrganizationId);
+	                    setActiveOrganizationId(nextOrganizationId);
+	                    setActiveProjectId(nextProject?.id || null);
+	                    setSelectedTaskId(null);
+	                  }}
+	                >
+                  {organizations.map(organization => (
+                    <option key={organization.id} value={organization.id}>{organization.name}</option>
+                  ))}
+                </select>
+                {activeOrganization && (
+                  <div className="organization-switcher-meta">
+                    {organizationRoleLabels[currentOrganizationRole] || 'Участник'} · {activeOrganizationMembers.length} сотрудников
+                  </div>
+                )}
+              </div>
               <div className="project-list">
-                {projects.map(project => {
+                {visibleProjects.map(project => {
                   const projectTasks = tasks.filter(t => stages.some(s => s.project_id === project.id && s.id === t.stage_id));
                   const overdueCount = projectTasks.filter(t => t.status === 'overdue').length;
                   const isEditingProjectName = editingProjectId === project.id;
@@ -1432,7 +1580,7 @@ function App() {
                       style={{ '--project-color': project.color || '#3b82f6' }}
                       onClick={() => { setActiveProjectId(project.id); setSelectedTaskId(null); }}
                     >
-                      {(currentUser?.role === 'Администратор' || currentUser?.role === 'Менеджер проектов') && (
+	                      {canCreateProjects && (
                         <label className="project-side-color-control" title="Изменить цвет проекта" onClick={(e) => e.stopPropagation()}>
                           <input type="color" value={project.color || '#3b82f6'} onChange={(e) => handleProjectColorChange(project, e.target.value)} />
                         </label>
@@ -1473,7 +1621,7 @@ function App() {
                               ✎
                             </button>
                           )}
-                          {currentUser?.role === 'Администратор' && (
+	                          {canManageOrganization && (
                              <button className="btn btn-icon project-delete-btn" title="Удалить проект" onClick={() => handleDeleteProject(project.id)}>✕</button>
                           )}
                         </div>
@@ -1485,6 +1633,9 @@ function App() {
                     </div>
                   );
                 })}
+                {visibleProjects.length === 0 && (
+                  <div className="empty-state">В этой организации пока нет проектов</div>
+                )}
               </div>
             </div>
           </aside>
@@ -1503,12 +1654,62 @@ function App() {
           )}
 
           {/* ADMIN VIEW */}
-          {activeView === 'admin' && currentUser.role === 'Администратор' && (
+          {activeView === 'admin' && isSuperAdmin && (
             <>
               <div className="panel-header"><h2>Панель администратора</h2></div>
               <div className="panel-content" style={{display: 'flex', gap: '2rem'}}>
                 
                 <div style={{flex: 2}}>
+                  <section className="admin-organization-panel">
+                    <div>
+                      <h3>Организации</h3>
+                      <p>Создайте группу и назначьте проектного менеджера, который сможет вести проекты внутри неё.</p>
+                    </div>
+                    <form className="admin-organization-form" onSubmit={handleCreateOrganization}>
+                      <input
+                        className="auth-input"
+                        style={{marginBottom: 0}}
+                        type="text"
+                        placeholder="Название организации"
+                        value={newOrganizationName}
+                        onChange={(e) => setNewOrganizationName(e.target.value)}
+                        required
+                      />
+                      <select
+                        className="edit-select"
+                        value={organizationManagerId}
+                        onChange={(e) => setOrganizationManagerId(e.target.value)}
+                      >
+                        <option value="">Проектный менеджер позже</option>
+                        {users.map(user => (
+                          <option key={user.id} value={user.id}>{user.name || user.email}</option>
+                        ))}
+                      </select>
+                      <button className="btn btn-primary" type="submit">Создать организацию</button>
+                    </form>
+                    <div className="admin-organization-list">
+                      {organizations.map(organization => {
+                        const members = organizationMembers.filter(member => member.organization_id === organization.id);
+                        const manager = members
+                          .filter(member => member.role === 'project_manager')
+                          .map(member => getUser(member.user_id)?.name || getUser(member.user_id)?.email)
+                          .filter(Boolean)
+                          .join(', ');
+                        return (
+                          <button
+                            key={organization.id}
+                            type="button"
+                            className={`admin-organization-item ${organization.id === activeOrganizationId ? 'active' : ''}`}
+                            onClick={() => setActiveOrganizationId(organization.id)}
+                          >
+                            <strong>{organization.name}</strong>
+                            <span>{members.length} сотрудников{manager ? ` · PM: ${manager}` : ''}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+
                   <h3 style={{marginBottom: '1rem'}}>Пользователи системы</h3>
                   <table className="admin-table">
                     <thead>
@@ -1806,7 +2007,7 @@ function App() {
                             <div className="stage-title" style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
                               <input type="color" value={stage.color || '#3b82f6'} onChange={(e) => handleStageColorChange(stage.id, e.target.value)} style={{width: '20px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer'}} title="Выбрать цвет этапа" />
                               <input type="text" value={stage.name} onChange={(e) => handleRenameStage(stage.id, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', outline: 'none' }} />
-                              {currentUser?.role === 'Администратор' && (
+                              {(canManageOrganization || isProjectLead) && (
                                 <button className="btn btn-icon danger" title="Удалить этап" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleDeleteStage(stage); }}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M3 6h18" />
@@ -1843,7 +2044,7 @@ function App() {
                                   title={task.desc?.trim() || task.name}
                                 >
                                   {task.is_modified && <div className="modified-indicator" title="В задаче были изменения"></div>}
-                                  {currentUser?.role === 'Администратор' && (
+                                  {(canManageOrganization || isProjectLead) && (
                                     <button className="task-delete-btn" title="Удалить задачу" onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}>
                                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M3 6h18" />
@@ -1965,7 +2166,7 @@ function App() {
                       <form className="project-member-form" onSubmit={handleAddProjectMember}>
                         <select className="edit-select" value={memberUserId} onChange={(e) => setMemberUserId(e.target.value)} required>
                           <option value="">Выберите сотрудника</option>
-                          {users.filter(user => !activeProjectMembers.some(member => member.user_id === user.id)).map(user => (
+                          {organizationUsers.filter(user => !activeProjectMembers.some(member => member.user_id === user.id)).map(user => (
                             <option key={user.id} value={user.id}>{user.name || user.email}</option>
                           ))}
                         </select>

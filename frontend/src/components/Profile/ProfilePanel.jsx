@@ -73,7 +73,7 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
   };
 
   const handleUpdatePassword = async () => {
-    if (currentUser.role !== 'Администратор') return;
+    if (!currentUser.is_super_admin) return;
 
     if (newPassword.length < 6) {
       alert("Пароль должен быть не короче 6 символов.");
@@ -181,7 +181,7 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
           </div>
         </div>
         <button className="btn btn-primary" onClick={handleUpdateProfile}>Сохранить изменения</button>
-        {currentUser.role === 'Администратор' && (
+        {currentUser.is_super_admin && (
           <div className="detail-section password-section">
             <div className="detail-label">Смена пароля</div>
             <input

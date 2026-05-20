@@ -842,6 +842,23 @@ body {
   flex-direction: column;
   gap: 0.5rem;
 }
+.organization-switcher {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+.organization-select {
+  width: 100%;
+  margin-bottom: 0;
+}
+.organization-switcher-meta {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
 .project-item {
   position: relative;
   padding: 0.75rem 1rem;
@@ -2235,6 +2252,68 @@ select.edit-select:focus {
 .admin-table tr:hover {
   background: rgba(255, 255, 255, 0.02);
 }
+.admin-organization-panel {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+.admin-organization-panel p {
+  margin-top: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.admin-organization-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  align-items: start;
+  gap: 0.75rem;
+}
+.admin-organization-form .edit-select {
+  width: 100%;
+  margin-bottom: 0;
+}
+.admin-organization-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+.admin-organization-item {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.admin-organization-item:hover,
+.admin-organization-item.active {
+  border-color: rgba(96, 165, 250, 0.44);
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--text-primary);
+}
+.admin-organization-item strong,
+.admin-organization-item span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-organization-item strong {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+}
+.admin-organization-item span {
+  margin-top: 0.25rem;
+  font-size: 0.76rem;
+}
 
 @media (max-width: 900px) {
   body {
@@ -2452,12 +2531,19 @@ select.edit-select:focus {
   }
 
   .project-member-form,
+  .admin-organization-form,
   .feed-input-group {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .admin-organization-form {
+    display: flex;
+  }
+
   .project-member-form .edit-select,
+  .admin-organization-form .edit-select,
+  .admin-organization-form .btn,
   .feed-input-group .btn,
   .edit-select.compact {
     width: 100%;
