@@ -50,6 +50,91 @@ const formatFileSize = (size) => {
 
 const MESSENGER_SIDEBAR_WIDTH = 260;
 const MESSENGER_HEADER_HEIGHT = 76;
+const MESSENGER_MIN_CHAT_WIDTH = 320;
+const MESSENGER_MIN_CHAT_HEIGHT = 340;
+const TASK_PANEL_WIDTH = 380;
+const FLOATING_WINDOW_MARGIN = 8;
+const CLOCK_TIME_ZONE_STORAGE_KEY = 'orbite-clock-time-zone';
+const CLOCK_TIME_ZONES = [
+  'Asia/Yekaterinburg',
+  'Europe/Moscow',
+  'UTC',
+  'Europe/Kaliningrad',
+  'Asia/Almaty',
+  'Asia/Dubai',
+  'Europe/London',
+  'Europe/Berlin',
+  'America/New_York',
+  'Asia/Tokyo'
+];
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const getBrowserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+const isValidTimeZone = (timeZone) => {
+  try {
+    Intl.DateTimeFormat('ru-RU', { timeZone }).format(Date.now());
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const getInitialClockTimeZone = () => {
+  const browserTimeZone = getBrowserTimeZone();
+  try {
+    const savedTimeZone = localStorage.getItem(CLOCK_TIME_ZONE_STORAGE_KEY);
+    return savedTimeZone && isValidTimeZone(savedTimeZone) ? savedTimeZone : browserTimeZone;
+  } catch {
+    return browserTimeZone;
+  }
+};
+
+const formatTimeZoneLabel = (timeZone) => timeZone.replace(/_/g, ' ');
+
+const getClockTimeZones = () => {
+  const browserTimeZone = getBrowserTimeZone();
+  return Array.from(new Set([browserTimeZone, ...CLOCK_TIME_ZONES]));
+};
+
+const fetchServerUtcMs = async (signal) => {
+  const syncRequests = [
+    async () => {
+      const response = await fetch('https://worldtimeapi.org/api/timezone/Etc/UTC', { cache: 'no-store', signal });
+      if (!response.ok) throw new Error('WorldTimeAPI is unavailable');
+      const data = await response.json();
+      const timestamp = Date.parse(data.utc_datetime || data.datetime);
+      if (Number.isNaN(timestamp)) throw new Error('WorldTimeAPI returned invalid time');
+      return { timestamp, source: 'WorldTimeAPI' };
+    },
+    async () => {
+      const response = await fetch('https://timeapi.io/api/TimeZone/zone?timeZone=UTC', { cache: 'no-store', signal });
+      if (!response.ok) throw new Error('TimeAPI is unavailable');
+      const data = await response.json();
+      const timestamp = Date.parse(data.currentUtcDateTime);
+      if (Number.isNaN(timestamp)) throw new Error('TimeAPI returned invalid time');
+      return { timestamp, source: 'TimeAPI' };
+    },
+    async () => {
+      const response = await fetch('/', { method: 'HEAD', cache: 'no-store', signal });
+      const serverDate = response.headers.get('date');
+      const timestamp = Date.parse(serverDate);
+      if (Number.isNaN(timestamp)) throw new Error('Server Date header is unavailable');
+      return { timestamp, source: 'сервер приложения' };
+    }
+  ];
+
+  for (const request of syncRequests) {
+    try {
+      return await request();
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
+  }
+
+  return { timestamp: Date.now(), source: 'локальное время' };
+};
 
 const logActionLabels = {
   create_stage: 'создал этап',
@@ -234,7 +319,6 @@ function App() {
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingProjectName, setEditingProjectName] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
-  const [descriptionTaskId, setDescriptionTaskId] = useState(null);
   const [draggedStageId, setDraggedStageId] = useState(null);
 
   const [panelPos, setPanelPos] = useState({ x: window.innerWidth - 420, y: 80 });
@@ -248,6 +332,14 @@ function App() {
   const [newUserRole, setNewUserRole] = useState('Сотрудник');
   const [memberUserId, setMemberUserId] = useState('');
   const [memberRole, setMemberRole] = useState('Участник');
+  const [clockTimeZone, setClockTimeZone] = useState(getInitialClockTimeZone);
+  const [clockNowMs, setClockNowMs] = useState(Date.now());
+  const [clockSyncState, setClockSyncState] = useState({
+    source: 'локальное время',
+    syncedAt: null,
+    isSyncing: true
+  });
+  const [isClockZoneMenuOpen, setIsClockZoneMenuOpen] = useState(false);
 
   const [adminEditingUser, setAdminEditingUser] = useState(null);
   const [adminEditPassword, setAdminEditPassword] = useState('');
@@ -255,9 +347,48 @@ function App() {
 
   const messengerEndRef = useRef(null);
   const messengerTextareaRef = useRef(null);
+  const clockMenuRef = useRef(null);
   const latestMessageAtRef = useRef('');
   const skipProjectNameSaveRef = useRef(false);
-  const taskDescriptionTimerRef = useRef(null);
+
+  const getConstrainedMessengerLayout = useCallback((position, size) => {
+    if (window.innerWidth <= 900) {
+      return { position, size };
+    }
+
+    const maxChatWidth = Math.max(
+      MESSENGER_MIN_CHAT_WIDTH,
+      window.innerWidth - MESSENGER_SIDEBAR_WIDTH - FLOATING_WINDOW_MARGIN * 3
+    );
+    const nextWidth = Math.min(size.width, maxChatWidth);
+    const totalWidth = MESSENGER_SIDEBAR_WIDTH + nextWidth;
+    const maxX = Math.max(FLOATING_WINDOW_MARGIN, window.innerWidth - totalWidth - FLOATING_WINDOW_MARGIN);
+    const nextX = clamp(position.x, FLOATING_WINDOW_MARGIN, maxX);
+
+    const maxChatHeight = Math.max(
+      MESSENGER_MIN_CHAT_HEIGHT,
+      window.innerHeight - MESSENGER_HEADER_HEIGHT - FLOATING_WINDOW_MARGIN * 2
+    );
+    const nextHeight = Math.min(size.height, maxChatHeight);
+    const maxY = Math.max(FLOATING_WINDOW_MARGIN, window.innerHeight - MESSENGER_HEADER_HEIGHT - nextHeight - FLOATING_WINDOW_MARGIN);
+    const nextY = clamp(position.y, FLOATING_WINDOW_MARGIN, maxY);
+
+    return {
+      position: { x: nextX, y: nextY },
+      size: { width: nextWidth, height: nextHeight }
+    };
+  }, []);
+
+  const getConstrainedPanelPosition = useCallback((position) => {
+    if (window.innerWidth <= 900) {
+      return position;
+    }
+
+    return {
+      x: clamp(position.x, FLOATING_WINDOW_MARGIN, Math.max(FLOATING_WINDOW_MARGIN, window.innerWidth - TASK_PANEL_WIDTH - FLOATING_WINDOW_MARGIN)),
+      y: clamp(position.y, FLOATING_WINDOW_MARGIN, Math.max(FLOATING_WINDOW_MARGIN, window.innerHeight - 120))
+    };
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -270,6 +401,68 @@ function App() {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CLOCK_TIME_ZONE_STORAGE_KEY, clockTimeZone);
+    } catch {
+      // Ignore storage failures; the clock still works for the current session.
+    }
+  }, [clockTimeZone]);
+
+  useEffect(() => {
+    if (!isClockZoneMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (clockMenuRef.current?.contains(event.target)) return;
+      setIsClockZoneMenuOpen(false);
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    return () => window.removeEventListener('pointerdown', handlePointerDown);
+  }, [isClockZoneMenuOpen]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let serverUtcMs = Date.now();
+    let localSyncedAtMs = Date.now();
+    const abortController = new AbortController();
+
+    const updateDisplayedTime = () => {
+      const elapsedMs = Date.now() - localSyncedAtMs;
+      setClockNowMs(serverUtcMs + elapsedMs);
+    };
+
+    const syncClock = async () => {
+      setClockSyncState(current => ({ ...current, isSyncing: true }));
+      const { timestamp, source } = await fetchServerUtcMs(abortController.signal);
+      if (!isMounted) return;
+      serverUtcMs = timestamp;
+      localSyncedAtMs = Date.now();
+      setClockNowMs(timestamp);
+      setClockSyncState({ source, syncedAt: localSyncedAtMs, isSyncing: false });
+    };
+
+    syncClock().catch(() => {
+      if (!isMounted) return;
+      serverUtcMs = Date.now();
+      localSyncedAtMs = Date.now();
+      setClockNowMs(serverUtcMs);
+      setClockSyncState({ source: 'локальное время', syncedAt: localSyncedAtMs, isSyncing: false });
+    });
+
+    const tickIntervalId = window.setInterval(updateDisplayedTime, 1000);
+    const syncIntervalId = window.setInterval(() => {
+      syncClock().catch(() => {});
+    }, 5 * 60 * 1000);
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+      window.clearInterval(tickIntervalId);
+      window.clearInterval(syncIntervalId);
+    };
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -366,28 +559,56 @@ function App() {
     }
   }, [siteMessages, isMessengerOpen]);
 
-  useEffect(() => () => {
-    if (taskDescriptionTimerRef.current) {
-      window.clearTimeout(taskDescriptionTimerRef.current);
-    }
-  }, []);
+  useEffect(() => {
+    const handleResize = () => {
+      setMessengerWindow(currentPosition => {
+        const nextLayout = getConstrainedMessengerLayout(currentPosition, messengerChatSize);
+        setMessengerChatSize(currentSize => (
+          currentSize.width === nextLayout.size.width && currentSize.height === nextLayout.size.height
+            ? currentSize
+            : nextLayout.size
+        ));
+        return currentPosition.x === nextLayout.position.x && currentPosition.y === nextLayout.position.y
+          ? currentPosition
+          : nextLayout.position;
+      });
+      setPanelPos(currentPosition => {
+        const nextPosition = getConstrainedPanelPosition(currentPosition);
+        return currentPosition.x === nextPosition.x && currentPosition.y === nextPosition.y
+          ? currentPosition
+          : nextPosition;
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, [getConstrainedMessengerLayout, getConstrainedPanelPosition, messengerChatSize]);
 
   useEffect(() => {
     if (!isDraggingMessenger && !isResizingMessenger) return undefined;
 
     const handleMouseMove = (e) => {
       if (isDraggingMessenger) {
-        const nextX = Math.min(window.innerWidth - 120, Math.max(8, e.clientX - messengerDragOffset.x));
-        const nextY = Math.min(window.innerHeight - 80, Math.max(8, e.clientY - messengerDragOffset.y));
-        setMessengerWindow(current => ({ ...current, x: nextX, y: nextY }));
+        const nextPosition = {
+          x: e.clientX - messengerDragOffset.x,
+          y: e.clientY - messengerDragOffset.y
+        };
+        setMessengerWindow(getConstrainedMessengerLayout(nextPosition, messengerChatSize).position);
       }
 
       if (isResizingMessenger && messengerResizeStart) {
-        const maxChatWidth = Math.max(320, window.innerWidth - messengerResizeStart.x - MESSENGER_SIDEBAR_WIDTH - 8);
-        const maxChatHeight = Math.max(340, window.innerHeight - messengerResizeStart.y - MESSENGER_HEADER_HEIGHT - 8);
-        const nextWidth = Math.min(maxChatWidth, Math.max(320, messengerResizeStart.width + e.clientX - messengerResizeStart.mouseX));
-        const nextHeight = Math.min(maxChatHeight, Math.max(340, messengerResizeStart.height + e.clientY - messengerResizeStart.mouseY));
-        setMessengerChatSize({ width: nextWidth, height: nextHeight });
+        const requestedSize = {
+          width: Math.max(MESSENGER_MIN_CHAT_WIDTH, messengerResizeStart.width + e.clientX - messengerResizeStart.mouseX),
+          height: Math.max(MESSENGER_MIN_CHAT_HEIGHT, messengerResizeStart.height + e.clientY - messengerResizeStart.mouseY)
+        };
+        const nextLayout = getConstrainedMessengerLayout(
+          { x: messengerResizeStart.x, y: messengerResizeStart.y },
+          requestedSize
+        );
+        setMessengerWindow(nextLayout.position);
+        setMessengerChatSize(nextLayout.size);
       }
     };
 
@@ -404,7 +625,7 @@ function App() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingMessenger, isResizingMessenger, messengerDragOffset, messengerResizeStart]);
+  }, [getConstrainedMessengerLayout, isDraggingMessenger, isResizingMessenger, messengerChatSize, messengerDragOffset, messengerResizeStart]);
 
   useEffect(() => {
     const textarea = messengerTextareaRef.current;
@@ -417,7 +638,7 @@ function App() {
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isDraggingPanel) return;
-      setPanelPos({ x: e.clientX - panelDragOffset.x, y: e.clientY - panelDragOffset.y });
+      setPanelPos(getConstrainedPanelPosition({ x: e.clientX - panelDragOffset.x, y: e.clientY - panelDragOffset.y }));
     };
     const handleMouseUp = () => setIsDraggingPanel(false);
 
@@ -430,7 +651,7 @@ function App() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingPanel, panelDragOffset]);
+  }, [getConstrainedPanelPosition, isDraggingPanel, panelDragOffset]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -616,28 +837,7 @@ function App() {
   };
 
   const handleSelectTask = (task) => {
-    setDescriptionTaskId(null);
     setSelectedTaskId(task.id);
-  };
-
-  const handleTaskDescriptionHoverStart = (task) => {
-    if (taskDescriptionTimerRef.current) {
-      window.clearTimeout(taskDescriptionTimerRef.current);
-    }
-    setDescriptionTaskId(null);
-    if (!task.desc?.trim()) return;
-
-    taskDescriptionTimerRef.current = window.setTimeout(() => {
-      setDescriptionTaskId(task.id);
-    }, 2400);
-  };
-
-  const handleTaskDescriptionHoverEnd = () => {
-    if (taskDescriptionTimerRef.current) {
-      window.clearTimeout(taskDescriptionTimerRef.current);
-      taskDescriptionTimerRef.current = null;
-    }
-    setDescriptionTaskId(null);
   };
 
   const handleMapBackgroundClick = () => {
@@ -977,13 +1177,64 @@ function App() {
     await supabase.from('stages').upsert(updates);
   };
 
+  const clockTime = new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone: clockTimeZone
+  }).format(clockNowMs);
+  const clockDate = new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: clockTimeZone
+  }).format(clockNowMs);
+  const clockSyncTitle = clockSyncState.syncedAt
+    ? `Синхронизировано: ${new Date(clockSyncState.syncedAt).toLocaleTimeString('ru-RU')}, источник: ${clockSyncState.source}`
+    : 'Синхронизация времени...';
+
   return (
     <LazyMotion features={domAnimation}>
     <div className="app-container">
       <header className="topbar">
         <div className="brand" onClick={() => setActiveView('map')} style={{cursor:'pointer'}}>Orbite Planing</div>
         
-        <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+        <div className="topbar-actions">
+          <div className="topbar-clock" ref={clockMenuRef} title={clockSyncTitle}>
+            <button
+              type="button"
+              className="topbar-clock-face"
+              aria-label="Часы и выбор часового пояса"
+              aria-expanded={isClockZoneMenuOpen}
+              onClick={() => setIsClockZoneMenuOpen(isOpen => !isOpen)}
+            >
+              <div className="topbar-clock-main">
+                <span className="topbar-clock-time">{clockTime}</span>
+                <span className="topbar-clock-separator" aria-hidden="true">|</span>
+                <span className="topbar-clock-date">{clockDate}</span>
+              </div>
+            </button>
+            {isClockZoneMenuOpen && (
+              <div className="topbar-clock-menu">
+                <label className="topbar-clock-zone-label" htmlFor="clock-time-zone">Часовой пояс</label>
+                <select
+                  id="clock-time-zone"
+                  className="topbar-clock-zone"
+                  value={clockTimeZone}
+                  aria-label="Часовой пояс"
+                  onChange={(e) => {
+                    setClockTimeZone(e.target.value);
+                    setIsClockZoneMenuOpen(false);
+                  }}
+                >
+                  {getClockTimeZones().map(timeZone => (
+                    <option key={timeZone} value={timeZone}>{formatTimeZoneLabel(timeZone)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           {currentUser.role === 'Администратор' && (
             <button 
               className={`btn ${activeView === 'admin' ? 'active' : ''}`}
@@ -997,16 +1248,18 @@ function App() {
           <button
             className={`btn btn-icon messenger-trigger ${isMessengerOpen ? 'active' : ''} ${hasUnreadMessages ? 'unread' : ''}`}
             title="Мессенджер"
+            aria-label="Мессенджер"
             onClick={() => {
               const nextOpenState = !isMessengerOpen;
               setIsMessengerOpen(nextOpenState);
               if (nextOpenState) setHasUnreadMessages(false);
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
-              <path d="M8 9h8" />
-              <path d="M8 13h5" />
+            <svg className="messenger-trigger-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3.3 7.8A2.3 2.3 0 0 1 5.6 5.5h12.8a2.3 2.3 0 0 1 2.3 2.3v8.4a2.3 2.3 0 0 1-2.3 2.3H5.6a2.3 2.3 0 0 1-2.3-2.3V7.8Z" />
+              <path d="m4.4 7 7.6 5.9L19.6 7" />
+              <path d="m9.9 11.3-5.3 5" />
+              <path d="m14.1 11.3 5.3 5" />
             </svg>
           </button>
 
@@ -1585,11 +1838,9 @@ function App() {
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ type: 'spring', stiffness: 420, damping: 34 }}
                                   style={{ '--task-stage-color': stage.color || '#3b82f6' }}
-                                  onMouseEnter={() => handleTaskDescriptionHoverStart(task)}
-                                  onMouseLeave={handleTaskDescriptionHoverEnd}
-                                  onFocus={() => handleTaskDescriptionHoverStart(task)}
-                                  onBlur={handleTaskDescriptionHoverEnd}
+                                  data-tooltip={task.desc?.trim() || task.name}
                                   onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}
+                                  title={task.desc?.trim() || task.name}
                                 >
                                   {task.is_modified && <div className="modified-indicator" title="В задаче были изменения"></div>}
                                   {currentUser?.role === 'Администратор' && (
@@ -1654,19 +1905,6 @@ function App() {
                                       {assignee && <div className="avatar sm" title={assignee.name || assignee.email} style={{backgroundColor: assignee.avatar_color}}>{getUserInitials(assignee.name || assignee.email)}</div>}
                                     </div>
                                   </div>
-                                  <AnimatePresence>
-                                    {descriptionTaskId === task.id && (
-                                      <m.div
-                                        className="task-description-tooltip"
-                                        initial={shouldReduceMotion ? false : { opacity: 0, y: 6, scale: 0.98 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.98 }}
-                                        transition={{ duration: 0.18, ease: 'easeOut' }}
-                                      >
-                                        {task.desc.trim()}
-                                      </m.div>
-                                    )}
-                                  </AnimatePresence>
                                 </m.div>
                               );
                             })}

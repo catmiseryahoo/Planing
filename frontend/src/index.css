@@ -79,7 +79,102 @@ body {
   font-weight: 700;
   font-size: 1.25rem;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+.topbar-clock {
+  position: relative;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+}
+.topbar-clock-face {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: 46px;
+  padding: 0.15rem 0.45rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.topbar-clock-face:hover,
+.topbar-clock-face:focus-visible {
+  background: rgba(255, 255, 255, 0.055);
+  outline: none;
+}
+.topbar-clock-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  line-height: 1;
+}
+.topbar-clock-time,
+.topbar-clock-date {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.topbar-clock-time {
+  color: var(--text-primary);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.topbar-clock-date {
+  color: var(--text-secondary);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.topbar-clock-separator {
+  color: var(--text-secondary);
+  font-size: 1.15rem;
+  line-height: 1;
+  opacity: 0.72;
+}
+.topbar-clock-menu {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  left: 0;
+  z-index: 260;
+  min-width: 230px;
+  padding: 0.65rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: var(--shadow-lg);
+}
+.topbar-clock-zone-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.topbar-clock-zone {
+  min-width: 0;
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--panel-border);
+  border-radius: calc(var(--radius-md) - 0.125rem);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.86rem;
+  outline: none;
+}
+.topbar-clock-zone:focus {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.22);
 }
 .user-profile {
   display: flex;
@@ -107,27 +202,63 @@ body {
   color: var(--text-secondary);
 }
 .messenger-trigger.active {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
-  border-color: rgba(34, 197, 94, 0.42);
+  background: rgba(255, 255, 255, 0.05);
+  color: #22c55e;
+  border-color: var(--panel-border);
 }
 .messenger-trigger {
-  color: #86efac;
-  border-color: rgba(34, 197, 94, 0.24);
-  background: rgba(34, 197, 94, 0.1);
+  position: relative;
+  overflow: visible;
+  min-width: 52px;
+  height: 42px;
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius-md);
+  color: #22c55e !important;
+  border: 1px solid var(--panel-border) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: var(--shadow-sm);
 }
 .messenger-trigger:hover {
-  background: rgba(34, 197, 94, 0.16);
+  color: #86efac !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(148, 163, 184, 0.82) !important;
+}
+.messenger-trigger::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #fbbf24;
+  border: 2px solid rgba(2, 6, 23, 0.86);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .messenger-trigger.unread {
-  animation: messengerPulse 2.4s ease-in-out infinite;
+  animation: messengerPulse 2.8s ease-in-out infinite;
+}
+.messenger-trigger.unread::after {
+  opacity: 1;
+  transform: scale(1);
+}
+.messenger-trigger-icon {
+  fill: none;
+  stroke: #22c55e;
+  stroke-width: 2.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 @keyframes messengerPulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.22);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.34);
+    color: #22c55e;
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+    box-shadow: 0 0 0 9px rgba(34, 197, 94, 0);
+    color: #86efac;
   }
 }
 .messenger-backdrop {
@@ -890,14 +1021,14 @@ body {
 }
 .stage-header {
   background: var(--card-bg);
-  padding: 1rem;
+  padding: 0.7rem 0.85rem;
   border-radius: var(--radius-lg);
   border: 1px solid var(--panel-border);
   box-shadow: var(--shadow-sm);
 }
 .stage-title {
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 .stage-stats {
   font-size: 0.75rem;
@@ -905,15 +1036,16 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.45rem;
 }
 .stage-progress-track {
-  height: 6px;
+  height: 5px;
 }
 .task-list {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  isolation: isolate;
 }
 .task-card {
   background: var(--card-bg);
@@ -924,7 +1056,11 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+}
+.task-card:hover,
+.task-card:focus-within {
+  z-index: 20;
 }
 .task-delete-btn {
   position: absolute;
@@ -973,12 +1109,17 @@ body {
   line-height: 1.4;
   color: var(--text-primary);
 }
-.task-description-tooltip {
+.task-card[data-tooltip]:hover::after,
+.task-card[data-tooltip]:focus-within::after {
+  content: attr(data-tooltip);
   position: absolute;
   left: 0.75rem;
   right: 0.75rem;
-  bottom: calc(100% + 0.55rem);
-  z-index: 12;
+  top: calc(100% + 0.55rem);
+  z-index: 40;
+  display: block;
+  max-height: 180px;
+  overflow-y: auto;
   padding: 0.75rem 0.85rem;
   border: 1px solid rgba(148, 163, 184, 0.32);
   border-radius: var(--radius-md);
@@ -990,18 +1131,17 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   pointer-events: none;
+  animation: taskTooltipIn 0.14s ease-out;
 }
-.task-description-tooltip::after {
-  content: "";
-  position: absolute;
-  left: 1rem;
-  top: 100%;
-  width: 10px;
-  height: 10px;
-  border-right: 1px solid rgba(148, 163, 184, 0.32);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.32);
-  background: rgba(15, 23, 42, 0.96);
-  transform: translateY(-5px) rotate(45deg);
+@keyframes taskTooltipIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .task-indicators {
   display: flex;
@@ -2094,4 +2234,359 @@ select.edit-select:focus {
 }
 .admin-table tr:hover {
   background: rgba(255, 255, 255, 0.02);
+}
+
+@media (max-width: 900px) {
+  body {
+    overflow: hidden;
+  }
+
+  .app-container {
+    height: 100dvh;
+    padding: 0.65rem;
+    gap: 0.65rem;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    flex: 1 1 160px;
+    padding-top: 0.45rem;
+    font-size: 1.05rem;
+  }
+
+  .topbar-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+  }
+
+  .topbar-actions > .btn:not(.btn-icon) {
+    min-height: 40px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.78rem;
+  }
+
+  .topbar-clock {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+
+  .messenger-trigger {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+  }
+
+  .user-profile {
+    min-width: 0;
+    gap: 0.45rem;
+    padding: 0.25rem;
+  }
+
+  .user-info {
+    max-width: 36vw;
+  }
+
+  .user-name,
+  .user-role {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .main-area {
+    min-height: 0;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .sidebar-left {
+    width: 100%;
+    max-height: 34dvh;
+  }
+
+  .main-content {
+    min-height: 0;
+  }
+
+  .sidebar-left > .panel-header,
+  .main-content > .project-main-header {
+    min-height: auto;
+  }
+
+  .panel-header {
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .panel-header h2 {
+    min-width: 0;
+  }
+
+  .panel-content {
+    padding: 1rem;
+  }
+
+  .project-overview {
+    grid-template-columns: 1fr 1fr;
+    padding: 0.85rem 1rem;
+  }
+
+  .project-progress-main {
+    grid-column: 1 / -1;
+  }
+
+  .project-header-title,
+  .project-name-input.header {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .view-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .view-tab {
+    flex: 0 0 auto;
+    padding: 0.5rem 0.75rem;
+    white-space: nowrap;
+  }
+
+  .map-container {
+    gap: 1rem;
+    padding-bottom: 0.85rem;
+    scroll-snap-type: x proximity;
+  }
+
+  .stage-column,
+  .add-stage-btn {
+    width: min(82vw, 320px);
+    scroll-snap-align: start;
+  }
+
+  .stage-column:not(:last-child)::after {
+    right: -1rem;
+    width: 1rem;
+  }
+
+  .task-card {
+    padding: 0.9rem;
+  }
+
+  .task-delete-btn {
+    opacity: 1;
+  }
+
+  .task-card[data-tooltip]:hover::after,
+  .task-card[data-tooltip]:focus-within::after {
+    display: none;
+  }
+
+  .sidebar-right {
+    inset: auto 0.65rem 0.65rem 0.65rem !important;
+    width: auto;
+    max-height: min(72dvh, 620px);
+  }
+
+  .messenger-popover {
+    inset: 0.65rem !important;
+    left: 0.65rem !important;
+    top: 0.65rem !important;
+    min-width: 0;
+    min-height: 0;
+    width: auto;
+    height: auto;
+    border-radius: var(--radius-lg);
+  }
+
+  .messenger-header {
+    cursor: default;
+    padding: 0.85rem;
+  }
+
+  .messenger-layout {
+    height: calc(100dvh - 8.8rem) !important;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .messenger-sidebar {
+    max-height: 188px;
+    border-right: 0;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .messenger-user-list {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(190px, 72vw);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.15rem;
+  }
+
+  .messenger-chat {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .messenger-messages {
+    padding: 0.85rem;
+  }
+
+  .messenger-bubble {
+    max-width: min(86%, 340px);
+  }
+
+  .messenger-resize-handle {
+    display: none;
+  }
+
+  .project-member-form,
+  .feed-input-group {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-member-form .edit-select,
+  .feed-input-group .btn,
+  .edit-select.compact {
+    width: 100%;
+  }
+
+  .project-files-view,
+  .project-member-list,
+  .team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-log-row,
+  .project-log-change,
+  .project-log-change.compact {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .auth-card {
+    width: min(100% - 1.3rem, 400px);
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar-actions {
+    justify-content: space-between;
+  }
+
+  .topbar-actions > .btn:not(.btn-icon) {
+    flex: 1 1 auto;
+  }
+
+  .user-info {
+    display: none;
+  }
+
+  .topbar-clock {
+    flex: 1 1 160px;
+  }
+
+  .topbar-clock-time {
+    font-size: 1.12rem;
+  }
+
+  .topbar-clock-date {
+    font-size: 1.12rem;
+  }
+
+  .topbar-clock-menu {
+    left: 0;
+    right: auto;
+    min-width: min(230px, 92vw);
+  }
+
+  .project-overview {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .overview-metric {
+    min-width: 0;
+    min-height: 76px;
+    padding: 0.65rem 0.55rem;
+  }
+
+  .overview-metric .overview-label {
+    font-size: 0.62rem;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .overview-value {
+    font-size: 1.55rem;
+    line-height: 1.05;
+  }
+
+  .project-progress-topline,
+  .project-progress-footer,
+  .task-meta,
+  .feed-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .messenger-popover {
+    inset: 0 !important;
+    left: 0 !important;
+    top: 0 !important;
+    border-radius: 0;
+  }
+
+  .messenger-layout {
+    height: calc(100dvh - 7.1rem) !important;
+  }
+
+  .messenger-sidebar {
+    max-height: 170px;
+  }
+
+  .messenger-user-list {
+    grid-auto-columns: minmax(170px, 80vw);
+  }
+
+  .messenger-bubble {
+    max-width: 92%;
+  }
+
+  .messenger-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .project-member-card-body {
+    padding: 0.9rem;
+  }
+
+  .project-member-photo {
+    height: 190px;
+  }
+
+  .project-member-contact,
+  .project-member-stats {
+    grid-template-columns: 1fr;
+  }
 }
