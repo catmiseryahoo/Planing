@@ -68,6 +68,18 @@ async function run() {
 
     // 3. Создаем таблицы для новых сущностей
     await client.query(`
+      -- Организации
+      CREATE TABLE IF NOT EXISTS organizations (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        name TEXT NOT NULL DEFAULT 'Основная организация',
+        owner_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+        notification_channels JSONB NOT NULL DEFAULT '{"telegram":{"enabled":false,"sender":"","destination":""},"whatsapp":{"enabled":false,"sender":"","phone":""},"email":{"enabled":false,"fromName":"","fromEmail":"","replyTo":""}}'::jsonb,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+      );
+
+      ALTER TABLE organizations
+      ADD COLUMN IF NOT EXISTS notification_channels JSONB NOT NULL DEFAULT '{"telegram":{"enabled":false,"sender":"","destination":""},"whatsapp":{"enabled":false,"sender":"","phone":""},"email":{"enabled":false,"fromName":"","fromEmail":"","replyTo":""}}'::jsonb;
+
       -- Проекты
       CREATE TABLE IF NOT EXISTS projects (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -79,6 +91,9 @@ async function run() {
         status TEXT DEFAULT 'Планируется',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
       );
+
+      ALTER TABLE projects
+      ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE;
 
       -- Этапы (Stages)
       CREATE TABLE IF NOT EXISTS stages (

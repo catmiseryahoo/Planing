@@ -2444,6 +2444,59 @@ select.edit-select:focus {
   margin-top: 0.25rem;
   font-size: 0.76rem;
 }
+.organization-channel-panel {
+  display: grid;
+  gap: 0.85rem;
+  padding-top: 0.25rem;
+}
+.organization-channel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.organization-channel-header h4 {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+.organization-channel-header .btn {
+  flex-shrink: 0;
+}
+.organization-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.organization-channel-card {
+  min-width: 0;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.035);
+}
+.organization-channel-card.active {
+  border-color: rgba(216, 157, 66, 0.38);
+  background: rgba(216, 157, 66, 0.09);
+}
+.organization-channel-card .edit-select {
+  width: 100%;
+  margin-bottom: 0;
+}
+.organization-channel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-primary);
+  font-weight: 800;
+  cursor: pointer;
+}
+.organization-channel-toggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent-color);
+}
 
 @media (max-width: 900px) {
   body {
@@ -2681,8 +2734,14 @@ select.edit-select:focus {
 
   .project-files-view,
   .project-member-list,
+  .organization-channel-grid,
   .team-grid {
     grid-template-columns: 1fr;
+  }
+
+  .organization-channel-header {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .project-log-row,

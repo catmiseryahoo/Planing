@@ -118,6 +118,35 @@ const getNotificationChannels = (user) => ({
   ...(user?.notification_channels || {})
 });
 
+const defaultOrganizationNotificationChannels = {
+  telegram: {
+    enabled: false,
+    sender: '',
+    destination: ''
+  },
+  whatsapp: {
+    enabled: false,
+    sender: '',
+    phone: ''
+  },
+  email: {
+    enabled: false,
+    fromName: '',
+    fromEmail: '',
+    replyTo: ''
+  }
+};
+
+const getOrganizationNotificationChannels = (organization) => {
+  const channels = organization?.notification_channels || {};
+  return Object.fromEntries(
+    Object.entries(defaultOrganizationNotificationChannels).map(([channel, defaults]) => [
+      channel,
+      { ...defaults, ...(channels[channel] || {}) }
+    ])
+  );
+};
+
 const getClockTimeZones = () => {
   const browserTimeZone = getBrowserTimeZone();
   return Array.from(new Set([browserTimeZone, ...CLOCK_TIME_ZONES]));
@@ -1113,6 +1142,62 @@ function App() {
     }
   };
 
+  const updateActiveOrganizationChannels = (channel, updates) => {
+    if (!activeOrganization) return;
+
+    const currentChannels = getOrganizationNotificationChannels(activeOrganization);
+    const nextChannels = {
+      ...currentChannels,
+      [channel]: {
+        ...currentChannels[channel],
+        ...updates
+      }
+    };
+
+    setOrganizations(organizations.map(organization => (
+      organization.id === activeOrganization.id
+        ? { ...organization, notification_channels: nextChannels }
+        : organization
+    )));
+  };
+
+  const handleSaveOrganizationChannels = async () => {
+    if (!activeOrganization || !canManageOrganizationStaff) return;
+    const notification_channels = getOrganizationNotificationChannels(activeOrganization);
+
+    if (notification_channels.whatsapp.enabled && !isCompletePhone(notification_channels.whatsapp.phone)) {
+      alert('Введите полный WhatsApp-номер организации (11 цифр).');
+      return;
+    }
+
+    if (
+      notification_channels.email.enabled
+      && notification_channels.email.fromEmail
+      && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notification_channels.email.fromEmail.trim().toLowerCase())
+    ) {
+      alert('Введите корректный Email отправителя организации.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('organizations')
+      .update({ notification_channels })
+      .eq('id', activeOrganization.id)
+      .select()
+      .single();
+
+    if (error) {
+      alert('Ошибка сохранения каналов организации: ' + error.message);
+      return;
+    }
+
+    if (data) {
+      setOrganizations(organizations.map(organization => organization.id === data.id ? data : organization));
+    }
+
+    alert('Каналы организации сохранены');
+  };
+
   const handleDeleteProjectMember = async (member) => {
     if (!canManageProjectMembers) return;
     const user = getUser(member.user_id);
@@ -1465,6 +1550,99 @@ function App() {
               </label>
             );
           })}
+        </div>
+      </div>
+    );
+  };
+  const renderOrganizationChannelSettings = () => {
+    if (!activeOrganization) return null;
+    const channels = getOrganizationNotificationChannels(activeOrganization);
+
+    return (
+      <div className="organization-channel-panel">
+        <div className="organization-channel-header">
+          <div>
+            <h4>Каналы организации</h4>
+            <p>От этих отправителей будут уходить внешние уведомления корпоративного мессенджера.</p>
+          </div>
+          <button className="btn btn-primary" type="button" onClick={handleSaveOrganizationChannels}>Сохранить</button>
+        </div>
+        <div className="organization-channel-grid">
+          <section className={`organization-channel-card ${channels.telegram.enabled ? 'active' : ''}`}>
+            <label className="organization-channel-toggle">
+              <input
+                type="checkbox"
+                checked={channels.telegram.enabled}
+                onChange={(e) => updateActiveOrganizationChannels('telegram', { enabled: e.target.checked })}
+              />
+              <span>Telegram</span>
+            </label>
+            <input
+              className="edit-select"
+              value={channels.telegram.sender}
+              onChange={(e) => updateActiveOrganizationChannels('telegram', { sender: e.target.value })}
+              placeholder="Название бота или канала"
+            />
+            <input
+              className="edit-select"
+              value={channels.telegram.destination}
+              onChange={(e) => updateActiveOrganizationChannels('telegram', { destination: e.target.value })}
+              placeholder="@channel или chat_id"
+            />
+          </section>
+          <section className={`organization-channel-card ${channels.whatsapp.enabled ? 'active' : ''}`}>
+            <label className="organization-channel-toggle">
+              <input
+                type="checkbox"
+                checked={channels.whatsapp.enabled}
+                onChange={(e) => updateActiveOrganizationChannels('whatsapp', { enabled: e.target.checked })}
+              />
+              <span>WhatsApp</span>
+            </label>
+            <input
+              className="edit-select"
+              value={channels.whatsapp.sender}
+              onChange={(e) => updateActiveOrganizationChannels('whatsapp', { sender: e.target.value })}
+              placeholder="Название отправителя"
+            />
+            <input
+              className="edit-select"
+              value={formatPhone(channels.whatsapp.phone)}
+              onChange={(e) => updateActiveOrganizationChannels('whatsapp', { phone: formatPhone(e.target.value) })}
+              placeholder="+7 (999) 000-00-00"
+              maxLength={18}
+            />
+          </section>
+          <section className={`organization-channel-card ${channels.email.enabled ? 'active' : ''}`}>
+            <label className="organization-channel-toggle">
+              <input
+                type="checkbox"
+                checked={channels.email.enabled}
+                onChange={(e) => updateActiveOrganizationChannels('email', { enabled: e.target.checked })}
+              />
+              <span>Email</span>
+            </label>
+            <input
+              className="edit-select"
+              value={channels.email.fromName}
+              onChange={(e) => updateActiveOrganizationChannels('email', { fromName: e.target.value })}
+              placeholder="Имя отправителя"
+            />
+            <input
+              className="edit-select"
+              type="email"
+              value={channels.email.fromEmail}
+              onChange={(e) => updateActiveOrganizationChannels('email', { fromEmail: e.target.value })}
+              placeholder="notify@company.ru"
+            />
+            <input
+              className="edit-select"
+              type="email"
+              value={channels.email.replyTo}
+              onChange={(e) => updateActiveOrganizationChannels('email', { replyTo: e.target.value })}
+              placeholder="reply-to, если отличается"
+            />
+          </section>
         </div>
       </div>
     );
@@ -1870,6 +2048,7 @@ function App() {
                         );
                       })}
                     </div>
+                    {renderOrganizationChannelSettings()}
                   </section>
 
 	                  <h3 style={{marginBottom: '1rem'}}>
