@@ -10,6 +10,7 @@ type UpdateUserProfilePayload = {
   userId?: string;
   name?: string;
   phone?: string;
+  telegram?: string;
   role?: string;
   avatar_color?: string;
   avatar_url?: string;
@@ -131,6 +132,7 @@ Deno.serve(async (req) => {
   const updates: Record<string, unknown> = {
     name: payload.name?.trim() || null,
     phone: payload.phone?.trim() || null,
+    telegram: payload.telegram?.replace(/^@/, '').trim() || null,
     role: payload.role,
     avatar_color: payload.avatar_color || null,
     avatar_url: payload.avatar_url || null,

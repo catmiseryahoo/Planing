@@ -23,6 +23,7 @@ async function run() {
         email TEXT UNIQUE NOT NULL,
         name TEXT,
         phone TEXT,
+        telegram TEXT,
         role TEXT DEFAULT 'Сотрудник', 
         is_super_admin BOOLEAN NOT NULL DEFAULT false,
         avatar_color TEXT DEFAULT '#3b82f6',
@@ -33,6 +34,9 @@ async function run() {
 
       ALTER TABLE profiles
       ADD COLUMN IF NOT EXISTS notification_channels JSONB NOT NULL DEFAULT '{"telegram": false, "whatsapp": false, "email": false}'::jsonb;
+
+      ALTER TABLE profiles
+      ADD COLUMN IF NOT EXISTS telegram TEXT;
 
       ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 

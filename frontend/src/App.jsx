@@ -1121,6 +1121,7 @@ function App() {
         userId: user.id,
         name: user.name,
         phone: user.phone,
+        telegram: user.telegram,
         role: user.role || 'Сотрудник',
         avatar_color: user.avatar_color,
         avatar_url: user.avatar_url,
@@ -2237,7 +2238,7 @@ function App() {
                           }
 
                           const { data: profileData, error } = await supabase.functions.invoke('update-user-profile', {
-                            body: { userId: id, name, phone, role, avatar_color, avatar_url, notification_channels }
+                            body: { userId: id, name, phone, telegram: adminEditingUser.telegram, role, avatar_color, avatar_url, notification_channels }
                           });
 
                           if (!error) {

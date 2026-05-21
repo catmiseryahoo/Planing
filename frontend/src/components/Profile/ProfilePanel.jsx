@@ -57,15 +57,29 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
       email: nextEmail,
       name: profileName, 
       phone: formatPhone(profilePhone), 
-      telegram: profileTelegram, 
+      telegram: profileTelegram.replace(/^@/, '').trim(),
       avatar_color: profileAvatarColor, 
-      avatar_url: profileAvatarUrl 
+      avatar_url: profileAvatarUrl,
+      notification_channels: currentUser.notification_channels
     };
     
-    const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
+    const { data, error } = await supabase.functions.invoke('update-user-profile', {
+      body: {
+        userId: currentUser.id,
+        name: updates.name,
+        phone: updates.phone,
+        telegram: updates.telegram,
+        role: currentUser.role || 'Сотрудник',
+        avatar_color: updates.avatar_color,
+        avatar_url: updates.avatar_url,
+        notification_channels: updates.notification_channels
+      }
+    });
+
     if (!error) {
-      setCurrentUser({ ...currentUser, ...updates });
-      setUsers(users.map(u => u.id === currentUser.id ? { ...u, ...updates } : u));
+      const updatedProfile = { ...(data?.profile || updates), email: nextEmail };
+      setCurrentUser({ ...currentUser, ...updatedProfile });
+      setUsers(users.map(u => u.id === currentUser.id ? { ...u, ...updatedProfile } : u));
       alert("Профиль обновлен!");
     } else {
       alert("Ошибка обновления профиля: " + error.message);
