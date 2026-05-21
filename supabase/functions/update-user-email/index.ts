@@ -19,6 +19,38 @@ const json = (body: unknown, status = 200) =>
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
+const canManageTargetUser = async (
+  adminClient: ReturnType<typeof createClient>,
+  actorUserId: string,
+  targetUserId: string,
+) => {
+  const { data: targetProfile, error: targetProfileError } = await adminClient
+    .from('profiles')
+    .select('is_super_admin')
+    .eq('id', targetUserId)
+    .single();
+
+  if (targetProfileError || targetProfile?.is_super_admin) return false;
+
+  const { data, error } = await adminClient
+    .from('organization_members')
+    .select('organization_id, role')
+    .eq('user_id', actorUserId)
+    .in('role', ['owner', 'admin', 'project_manager']);
+
+  if (error || !data?.length) return false;
+
+  const organizationIds = data.map((member) => member.organization_id);
+  const { data: targetMembership, error: targetMembershipError } = await adminClient
+    .from('organization_members')
+    .select('id')
+    .eq('user_id', targetUserId)
+    .in('organization_id', organizationIds)
+    .limit(1);
+
+  return !targetMembershipError && Boolean(targetMembership?.length);
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -81,7 +113,9 @@ Deno.serve(async (req) => {
   const isSuperAdmin = Boolean(currentProfile?.is_super_admin);
   const isSelf = targetUserId === user.id;
 
-  if (!isSuperAdmin && !isSelf) {
+  const canManageTarget = !isSelf && await canManageTargetUser(adminClient, user.id, targetUserId);
+
+  if (!isSuperAdmin && !isSelf && !canManageTarget) {
     return json({ error: 'Forbidden' }, 403);
   }
 

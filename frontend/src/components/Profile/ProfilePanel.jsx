@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../supabaseClient';
+import { formatPhone, isCompletePhone } from '../../utils/phone';
 
 export default function ProfilePanel({ currentUser, users, setUsers, setCurrentUser }) {
   const [profileEmail, setProfileEmail] = useState(currentUser.email || '');
@@ -33,8 +34,7 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
       return;
     }
 
-    const phoneDigits = profilePhone.replace(/\D/g, '');
-    if (phoneDigits && phoneDigits.length < 11) {
+    if (!isCompletePhone(profilePhone)) {
       alert("Пожалуйста, введите полный номер телефона (11 цифр).");
       return;
     }
@@ -56,7 +56,7 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
     const updates = { 
       email: nextEmail,
       name: profileName, 
-      phone: profilePhone, 
+      phone: formatPhone(profilePhone), 
       telegram: profileTelegram, 
       avatar_color: profileAvatarColor, 
       avatar_url: profileAvatarUrl 
@@ -103,18 +103,7 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
   };
 
   const handlePhoneChange = (e) => {
-    let val = e.target.value.replace(/\D/g, '');
-    if (!val) { setProfilePhone(''); return; }
-    if (val.length > 0 && val[0] === '8') val = '7' + val.substring(1);
-    else if (val.length > 0 && val[0] !== '7') val = '7' + val;
-
-    let res = '+7';
-    if (val.length > 1) res += ' (' + val.substring(1, 4);
-    if (val.length >= 5) res += ') ' + val.substring(4, 7);
-    if (val.length >= 8) res += '-' + val.substring(7, 9);
-    if (val.length >= 10) res += '-' + val.substring(9, 11);
-    
-    setProfilePhone(res);
+    setProfilePhone(formatPhone(e.target.value));
   };
 
   return (
@@ -133,7 +122,7 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
           <div className="detail-label">Телефон</div>
           <input 
             className="edit-select" 
-            value={profilePhone} 
+            value={formatPhone(profilePhone)} 
             onChange={handlePhoneChange} 
             placeholder="+7 (999) 000-00-00" 
             maxLength={18}

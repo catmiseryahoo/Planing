@@ -6,10 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-type UpdateUserPasswordPayload = {
+type UpdateUserProfilePayload = {
   userId?: string;
-  password?: string;
+  name?: string;
+  phone?: string;
+  role?: string;
+  avatar_color?: string;
+  avatar_url?: string;
+  notification_channels?: Record<string, boolean>;
 };
+
+const allowedRoles = new Set([
+  'Администратор',
+  'Менеджер проектов',
+  'Дизайнер',
+  'Разработчик',
+  'Сотрудник',
+]);
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -90,6 +103,13 @@ Deno.serve(async (req) => {
     return json({ error: 'Unauthorized' }, 401);
   }
 
+  const payload = (await req.json()) as UpdateUserProfilePayload;
+  const targetUserId = payload.userId || user.id;
+
+  if (!targetUserId || !payload.role || !allowedRoles.has(payload.role)) {
+    return json({ error: 'Invalid profile data' }, 400);
+  }
+
   const { data: currentProfile, error: profileError } = await adminClient
     .from('profiles')
     .select('is_super_admin')
@@ -100,28 +120,36 @@ Deno.serve(async (req) => {
     return json({ error: profileError.message }, 500);
   }
 
-  const payload = (await req.json()) as UpdateUserPasswordPayload;
-  const targetUserId = payload.userId || user.id;
-  const password = payload.password || '';
-
-  if (!targetUserId || password.length < 6) {
-    return json({ error: 'Password must be at least 6 characters' }, 400);
-  }
-
+  const isSuperAdmin = Boolean(currentProfile?.is_super_admin);
   const isSelf = targetUserId === user.id;
   const canManageTarget = !isSelf && await canManageTargetUser(adminClient, user.id, targetUserId);
 
-  if (!currentProfile?.is_super_admin && !canManageTarget) {
+  if (!isSuperAdmin && !isSelf && !canManageTarget) {
     return json({ error: 'Forbidden' }, 403);
   }
 
-  const { data, error } = await adminClient.auth.admin.updateUserById(targetUserId, {
-    password,
-  });
+  const updates: Record<string, unknown> = {
+    name: payload.name?.trim() || null,
+    phone: payload.phone?.trim() || null,
+    role: payload.role,
+    avatar_color: payload.avatar_color || null,
+    avatar_url: payload.avatar_url || null,
+  };
 
-  if (error) {
-    return json({ error: error.message }, 400);
+  if (payload.notification_channels) {
+    updates.notification_channels = payload.notification_channels;
   }
 
-  return json({ user: data.user });
+  const { data, error } = await adminClient
+    .from('profiles')
+    .update(updates)
+    .eq('id', targetUserId)
+    .select()
+    .single();
+
+  if (error) {
+    return json({ error: error.message }, 500);
+  }
+
+  return json({ profile: data });
 });

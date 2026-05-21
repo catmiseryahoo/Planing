@@ -27,8 +27,12 @@ async function run() {
         is_super_admin BOOLEAN NOT NULL DEFAULT false,
         avatar_color TEXT DEFAULT '#3b82f6',
         avatar_url TEXT,
+        notification_channels JSONB NOT NULL DEFAULT '{"telegram": false, "whatsapp": false, "email": false}'::jsonb,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
       );
+
+      ALTER TABLE profiles
+      ADD COLUMN IF NOT EXISTS notification_channels JSONB NOT NULL DEFAULT '{"telegram": false, "whatsapp": false, "email": false}'::jsonb;
 
       ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 

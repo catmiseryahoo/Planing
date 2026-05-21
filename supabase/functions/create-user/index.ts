@@ -11,6 +11,7 @@ type CreateUserPayload = {
   password?: string;
   name?: string;
   role?: string;
+  organizationId?: string;
 };
 
 const allowedRoles = new Set([
@@ -78,15 +79,33 @@ Deno.serve(async (req) => {
     return json({ error: profileError.message }, 500);
   }
 
-  if (!currentProfile?.is_super_admin) {
-    return json({ error: 'Forbidden' }, 403);
-  }
-
   const payload = (await req.json()) as CreateUserPayload;
   const email = payload.email?.trim().toLowerCase();
   const password = payload.password;
   const name = payload.name?.trim();
   const role = payload.role || 'Сотрудник';
+  const organizationId = payload.organizationId;
+
+  if (!currentProfile?.is_super_admin) {
+    if (!organizationId) {
+      return json({ error: 'Organization is required' }, 400);
+    }
+
+    const { data: managerMembership, error: membershipError } = await adminClient
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', organizationId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (membershipError) {
+      return json({ error: membershipError.message }, 500);
+    }
+
+    if (!['owner', 'admin', 'project_manager'].includes(managerMembership?.role || '')) {
+      return json({ error: 'Forbidden' }, 403);
+    }
+  }
 
   if (!email || !password || password.length < 6 || !name || !allowedRoles.has(role)) {
     return json({ error: 'Invalid user data' }, 400);
@@ -110,6 +129,17 @@ Deno.serve(async (req) => {
 
   if (updateError) {
     return json({ error: updateError.message }, 500);
+  }
+
+  if (organizationId) {
+    const organizationRole = role === 'Менеджер проектов' ? 'project_manager' : 'member';
+    const { error: membershipInsertError } = await adminClient
+      .from('organization_members')
+      .upsert([{ organization_id: organizationId, user_id: data.user.id, role: organizationRole }], { onConflict: 'organization_id,user_id' });
+
+    if (membershipInsertError) {
+      return json({ error: membershipInsertError.message }, 500);
+    }
   }
 
   return json({ user: data.user }, 201);

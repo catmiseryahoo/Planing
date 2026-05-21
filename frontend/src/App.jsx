@@ -5,6 +5,7 @@ import AuthScreen from './components/Auth/AuthScreen';
 import ProfilePanel from './components/Profile/ProfilePanel';
 import TaskSidebar from './components/Task/TaskSidebar';
 import GanttChart from './components/Map/GanttChart';
+import { formatPhone, isCompletePhone } from './utils/phone';
 import './index.css';
 
 const statusLabels = {
@@ -99,6 +100,23 @@ const organizationRoleLabels = {
   project_manager: 'Проектный менеджер',
   member: 'Участник'
 };
+
+const defaultNotificationChannels = {
+  telegram: false,
+  whatsapp: false,
+  email: false
+};
+
+const notificationChannelLabels = {
+  telegram: 'Telegram',
+  whatsapp: 'WhatsApp',
+  email: 'Email'
+};
+
+const getNotificationChannels = (user) => ({
+  ...defaultNotificationChannels,
+  ...(user?.notification_channels || {})
+});
 
 const getClockTimeZones = () => {
   const browserTimeZone = getBrowserTimeZone();
@@ -695,14 +713,15 @@ function App() {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
-    if (!currentUser?.is_super_admin) return;
+    if (!canManageOrganizationStaff) return;
 
     const { data, error } = await supabase.functions.invoke('create-user', {
       body: {
         email: newUserEmail,
         password: newUserPassword,
         name: newUserName,
-        role: newUserRole
+        role: newUserRole,
+        organizationId: activeOrganizationId
       }
     });
 
@@ -767,6 +786,7 @@ function App() {
     return isSuperAdmin || !user?.is_super_admin;
   });
   const canManageProjectMembers = canManageOrganization || isProjectLead;
+  const canConfigureNotificationChannels = canManageProjectMembers || canManageOrganizationStaff;
   const canRenameProject = (projectId) => canManageOrganization || projectMembers.some(member =>
     member.project_id === projectId &&
     member.user_id === currentUser?.id &&
@@ -1054,6 +1074,42 @@ function App() {
         entityName: user?.name || user?.email,
         details: { changes: [{ field: 'role', label: 'Роль', from: member.role || 'Участник', to: role }] }
       });
+    }
+  };
+
+  const handleNotificationChannelChange = async (user, channel, enabled) => {
+    if (!user?.id || !canConfigureNotificationChannels) return;
+
+    const nextChannels = {
+      ...getNotificationChannels(user),
+      [channel]: enabled
+    };
+
+    setUsers(users.map(item => item.id === user.id ? { ...item, notification_channels: nextChannels } : item));
+
+    const { data, error } = await supabase.functions.invoke('update-user-profile', {
+      body: {
+        userId: user.id,
+        name: user.name,
+        phone: user.phone,
+        role: user.role || 'Сотрудник',
+        avatar_color: user.avatar_color,
+        avatar_url: user.avatar_url,
+        notification_channels: nextChannels
+      }
+    });
+
+    if (error) {
+      setUsers(users);
+      alert('Ошибка сохранения каналов уведомлений: ' + error.message);
+      return;
+    }
+
+    if (data?.profile) {
+      setUsers(currentUsers => currentUsers.map(item => item.id === user.id ? { ...item, ...data.profile } : item));
+      if (adminEditingUser?.id === user.id) {
+        setAdminEditingUser(currentEditingUser => currentEditingUser ? { ...currentEditingUser, ...data.profile } : currentEditingUser);
+      }
     }
   };
 
@@ -1378,6 +1434,41 @@ function App() {
   const clockSyncTitle = clockSyncState.syncedAt
     ? `Синхронизировано: ${new Date(clockSyncState.syncedAt).toLocaleTimeString('ru-RU')}, источник: ${clockSyncState.source}`
     : 'Синхронизация времени...';
+  const renderNotificationChannelControls = (user) => {
+    const notificationChannels = getNotificationChannels(user);
+    const channelAvailability = {
+      telegram: Boolean(user?.telegram),
+      whatsapp: Boolean(user?.phone),
+      email: Boolean(user?.email)
+    };
+
+    return (
+      <div className="project-member-notifications">
+        <div>
+          <div className="project-member-section-title">Уведомления</div>
+          <p>Каналы для сообщений корпоративного мессенджера</p>
+        </div>
+        <div className="notification-channel-list">
+          {Object.keys(defaultNotificationChannels).map(channel => {
+            const isAvailable = channelAvailability[channel];
+            const isEnabled = Boolean(notificationChannels[channel]) && isAvailable;
+            return (
+              <label key={channel} className={`notification-channel ${isEnabled ? 'active' : ''} ${!isAvailable ? 'disabled' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={isEnabled}
+                  disabled={!canConfigureNotificationChannels || !isAvailable}
+                  onChange={(e) => handleNotificationChannelChange(user, channel, e.target.checked)}
+                />
+                <span>{notificationChannelLabels[channel]}</span>
+                {!isAvailable && <em>нет контакта</em>}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <LazyMotion features={domAnimation}>
@@ -1803,16 +1894,16 @@ function App() {
                             </div>
                           </td>
                           <td>{u.email}</td>
-                          <td>{u.phone || '—'}</td>
+                          <td>{formatPhone(u.phone) || '—'}</td>
 	                          <td>
-	                            <div className="admin-table-actions">
-	                              {isSuperAdmin && (
-	                                <button className="btn btn-icon" onClick={() => {
-	                                  setAdminEditingUser(u);
-	                                  setAdminEditPassword('');
-	                                  setAdminEditPasswordConfirm('');
-	                                }} title="Редактировать">✏️</button>
-	                              )}
+		                            <div className="admin-table-actions">
+                              {canManageOrganizationStaff && (
+                                <button className="btn btn-icon" onClick={() => {
+                                  setAdminEditingUser(u);
+                                  setAdminEditPassword('');
+                                  setAdminEditPasswordConfirm('');
+                                }} title="Редактировать сотрудника">✏️</button>
+                              )}
 	                              {canDismissOrganizationUser(u) && (
 	                                <button className="btn btn-icon danger" onClick={() => handleDismissOrganizationUser(u)} title="Уволить из организации">✕</button>
 	                              )}
@@ -1832,7 +1923,7 @@ function App() {
                 </div>
 
                 <div style={{flex: 1, borderLeft: '1px solid var(--panel-border)', paddingLeft: '2rem'}}>
-		                  {isSuperAdmin ? (adminEditingUser ? (
+		                  {canManageOrganizationStaff ? (adminEditingUser ? (
                     <div>
                       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '1rem'}}>
                         <h3>Редактирование: {adminEditingUser.name}</h3>
@@ -1852,7 +1943,13 @@ function App() {
                       </div>
                       <div className="detail-section">
                         <div className="detail-label">Телефон</div>
-                        <input className="edit-select" value={adminEditingUser.phone || ''} onChange={e => setAdminEditingUser({...adminEditingUser, phone: e.target.value})} />
+                        <input
+                          className="edit-select"
+                          value={formatPhone(adminEditingUser.phone)}
+                          onChange={e => setAdminEditingUser({...adminEditingUser, phone: formatPhone(e.target.value)})}
+                          placeholder="+7 (999) 000-00-00"
+                          maxLength={18}
+                        />
                       </div>
                       <div className="detail-section">
                         <div className="detail-label">Роль</div>
@@ -1912,13 +2009,19 @@ function App() {
                            </div>
                         </div>
                       </div>
-                      <button className="btn btn-primary" onClick={async () => {
-                          const { id, email, name, phone, role, avatar_color, avatar_url } = adminEditingUser;
+                      {renderNotificationChannelControls(adminEditingUser)}
+                      <button className="btn btn-primary admin-save-btn" onClick={async () => {
+                          const { id, email, name, phone, role, avatar_color, avatar_url, notification_channels } = adminEditingUser;
                           const nextEmail = (email || '').trim().toLowerCase();
                           const originalUser = users.find(u => u.id === id);
 
                           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
                             alert('Введите корректный Email');
+                            return;
+                          }
+
+                          if (!isCompletePhone(phone)) {
+                            alert('Пожалуйста, введите полный номер телефона (11 цифр).');
                             return;
                           }
 
@@ -1954,18 +2057,21 @@ function App() {
                             }
                           }
 
-                          const { error } = await supabase.from('profiles').update({ email: nextEmail, name, phone, role, avatar_color, avatar_url }).eq('id', id);
+                          const { data: profileData, error } = await supabase.functions.invoke('update-user-profile', {
+                            body: { userId: id, name, phone, role, avatar_color, avatar_url, notification_channels }
+                          });
+
                           if (!error) {
-                             const updatedUser = { ...adminEditingUser, email: nextEmail };
+                             const updatedUser = { ...adminEditingUser, ...(profileData?.profile || {}), email: nextEmail };
                              setUsers(users.map(u => u.id === id ? updatedUser : u));
-                             if (id === currentUser.id) setCurrentUser({...currentUser, email: nextEmail, name, phone, role, avatar_color, avatar_url});
+                             if (id === currentUser.id) setCurrentUser({...currentUser, ...updatedUser});
                              setAdminEditingUser(null);
                              setAdminEditPassword('');
                              setAdminEditPasswordConfirm('');
                           } else {
                              alert('Ошибка: ' + error.message);
                           }
-                      }}>Сохранить сотрудника</button>
+                      }}>Сохранить</button>
                     </div>
                   ) : (
                     <div>
@@ -1997,7 +2103,7 @@ function App() {
                       </form>
                     </div>
 	                  )) : (
-	                    <div className="empty-state">Выберите сотрудника слева, чтобы управлять составом организации.</div>
+	                    <div className="empty-state">Выберите сотрудника слева, чтобы настроить каналы уведомлений или удалить его из системы.</div>
 	                  )}
                 </div>
                 
@@ -2293,7 +2399,7 @@ function App() {
                               {user?.avatar_url ? (
                                 <img src={user.avatar_url} alt={user?.name || user?.email || 'Сотрудник'} />
                               ) : (
-                                <div className="project-member-photo-fallback" style={{backgroundColor: user?.avatar_color || '#3b82f6'}}>{getUserInitials(user?.name || user?.email)}</div>
+                                <div className="project-member-photo-fallback">{getUserInitials(user?.name || user?.email)}</div>
                               )}
                               {canManageProjectMembers && (
                                 <button className="project-member-remove" title="Удалить из проекта" onClick={() => handleDeleteProjectMember(member)}>✕</button>
@@ -2318,7 +2424,7 @@ function App() {
                                   <span className="project-member-contact-icon"><ProjectMemberIcon type="phone" /></span>
                                   <div>
                                     <span>Телефон</span>
-                                    <strong>{user?.phone || 'Не указан'}</strong>
+                                    <strong>{formatPhone(user?.phone) || 'Не указан'}</strong>
                                   </div>
                                 </div>
                                 <div className="project-member-contact accent-cyan">
@@ -2367,6 +2473,7 @@ function App() {
                                   <span style={{ width: `${workloadPercent}%` }} />
                                 </div>
                               </div>
+                              {canConfigureNotificationChannels && renderNotificationChannelControls(user)}
                               <div className="project-member-card-actions">
                                 {canManageProjectMembers ? (
                                   <select className="edit-select compact" value={member.role} onChange={(e) => handleProjectMemberRoleChange(member, e.target.value)}>
