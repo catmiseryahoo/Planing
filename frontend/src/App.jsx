@@ -952,6 +952,14 @@ function App() {
     }
 
     setSiteMessages(currentMessages => currentMessages.map(message => message.id === optimisticMessage.id ? data : message));
+    const { data: notificationData, error: notificationError } = await supabase.functions.invoke('dispatch-message-notifications', {
+      body: { messageId: data.id }
+    });
+    if (notificationError) {
+      console.warn('Ошибка отправки внешних уведомлений:', notificationError.message);
+    } else if (notificationData?.results) {
+      console.info('Внешние уведомления:', notificationData.results);
+    }
   };
 
   const handlePanelDragStart = (e) => {
