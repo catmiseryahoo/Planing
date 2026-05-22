@@ -2,12 +2,9 @@ import { useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { formatPhone, isCompletePhone } from '../../utils/phone';
 
-const getTelegramBotUsername = (organization) => {
-  const sender = organization?.notification_channels?.telegram?.sender || '';
-  return sender.replace(/^@/, '').trim();
-};
+const telegramBotUsername = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'OrbitePlaner_bot').replace(/^@/, '').trim();
 
-export default function ProfilePanel({ currentUser, users, setUsers, setCurrentUser, activeOrganization }) {
+export default function ProfilePanel({ currentUser, users, setUsers, setCurrentUser }) {
   const [profileEmail, setProfileEmail] = useState(currentUser.email || '');
   const [profileName, setProfileName] = useState(currentUser.name || '');
   const [profilePhone, setProfilePhone] = useState(currentUser.phone || '');
@@ -153,7 +150,6 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
   };
 
   const isTelegramLinked = Boolean(currentUser.telegram_chat_id);
-  const telegramBotUsername = getTelegramBotUsername(activeOrganization);
   const telegramBotUrl = telegramBotUsername ? `https://t.me/${telegramBotUsername}` : '';
   const telegramLinkCommand = telegramLinkCode ? `/start ${telegramLinkCode}` : '';
   const telegramLinkExpiresText = telegramLinkExpiresAt
@@ -216,7 +212,7 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
                     Открыть корпоративного бота @{telegramBotUsername}
                   </a>
                 ) : (
-                  <small>Укажите username бота в настройках Telegram-канала организации.</small>
+                  <small>Общий Telegram-бот приложения пока не настроен.</small>
                 )}
               </div>
             )}

@@ -1572,7 +1572,7 @@ function App() {
         <div className="organization-channel-header">
           <div>
             <h4>Каналы организации</h4>
-            <p>От этих отправителей будут уходить внешние уведомления корпоративного мессенджера.</p>
+            <p>Здесь включаются внешние уведомления и необязательные каналы организации.</p>
           </div>
           <button className="btn btn-primary" type="button" onClick={handleSaveOrganizationChannels}>Сохранить</button>
         </div>
@@ -1586,17 +1586,14 @@ function App() {
               />
               <span>Telegram</span>
             </label>
-            <input
-              className="edit-select"
-              value={channels.telegram.sender}
-              onChange={(e) => updateActiveOrganizationChannels('telegram', { sender: e.target.value })}
-              placeholder="Название бота или канала"
-            />
+            <p className="organization-channel-hint">
+              Личные уведомления отправляет общий бот приложения. Канал ниже нужен только для копии уведомлений в общий чат организации.
+            </p>
             <input
               className="edit-select"
               value={channels.telegram.destination}
               onChange={(e) => updateActiveOrganizationChannels('telegram', { destination: e.target.value })}
-              placeholder="@channel или chat_id"
+              placeholder="@channel или chat_id организации"
             />
           </section>
           <section className={`organization-channel-card ${channels.whatsapp.enabled ? 'active' : ''}`}>
@@ -1991,7 +1988,6 @@ function App() {
               users={users}
               setUsers={setUsers}
               setCurrentUser={setCurrentUser}
-              activeOrganization={activeOrganization}
             />
           )}
 
