@@ -1986,11 +1986,12 @@ function App() {
           
           {/* PROFILE VIEW */}
           {activeView === 'profile' && (
-            <ProfilePanel 
-              currentUser={currentUser} 
-              users={users} 
-              setUsers={setUsers} 
-              setCurrentUser={setCurrentUser} 
+            <ProfilePanel
+              currentUser={currentUser}
+              users={users}
+              setUsers={setUsers}
+              setCurrentUser={setCurrentUser}
+              activeOrganization={activeOrganization}
             />
           )}
 

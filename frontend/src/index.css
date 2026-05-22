@@ -1290,6 +1290,16 @@ body::before {
 .telegram-link-command small {
   color: var(--text-secondary);
 }
+.telegram-link-command a {
+  width: fit-content;
+  color: #93c5fd;
+  font-weight: 700;
+  text-decoration: none;
+}
+.telegram-link-command a:hover {
+  color: #bfdbfe;
+  text-decoration: underline;
+}
 .detail-label {
   font-size: 0.75rem;
   text-transform: uppercase;

@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { formatPhone, isCompletePhone } from '../../utils/phone';
 
-export default function ProfilePanel({ currentUser, users, setUsers, setCurrentUser }) {
+const getTelegramBotUsername = (organization) => {
+  const sender = organization?.notification_channels?.telegram?.sender || '';
+  return sender.replace(/^@/, '').trim();
+};
+
+export default function ProfilePanel({ currentUser, users, setUsers, setCurrentUser, activeOrganization }) {
   const [profileEmail, setProfileEmail] = useState(currentUser.email || '');
   const [profileName, setProfileName] = useState(currentUser.name || '');
   const [profilePhone, setProfilePhone] = useState(currentUser.phone || '');
@@ -148,6 +153,8 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
   };
 
   const isTelegramLinked = Boolean(currentUser.telegram_chat_id);
+  const telegramBotUsername = getTelegramBotUsername(activeOrganization);
+  const telegramBotUrl = telegramBotUsername ? `https://t.me/${telegramBotUsername}` : '';
   const telegramLinkCommand = telegramLinkCode ? `/start ${telegramLinkCode}` : '';
   const telegramLinkExpiresText = telegramLinkExpiresAt
     ? new Date(telegramLinkExpiresAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
@@ -204,6 +211,13 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
               <div className="telegram-link-command">
                 <span>{telegramLinkCommand}</span>
                 <small>{telegramLinkExpiresText ? `Действует до ${telegramLinkExpiresText}` : 'Код действует 15 минут'}</small>
+                {telegramBotUrl ? (
+                  <a href={telegramBotUrl} target="_blank" rel="noreferrer">
+                    Открыть корпоративного бота @{telegramBotUsername}
+                  </a>
+                ) : (
+                  <small>Укажите username бота в настройках Telegram-канала организации.</small>
+                )}
               </div>
             )}
           </div>
