@@ -371,7 +371,8 @@ function App() {
 
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [activeOrganizationId, setActiveOrganizationId] = useState(null);
-  const [activeView, setActiveView] = useState('map'); // map, profile, admin
+  const [activeView, setActiveView] = useState('map'); // map, admin
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeProjectView, setActiveProjectView] = useState('kanban'); // kanban, gantt
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingProjectName, setEditingProjectName] = useState('');
@@ -1725,9 +1726,9 @@ function App() {
           </button>
 
           <div 
-            className="user-profile" 
+            className={`user-profile ${isProfileOpen ? 'active' : ''}`}
             title="Личный кабинет" 
-            onClick={() => setActiveView(activeView === 'profile' ? 'map' : 'profile')}
+            onClick={() => setIsProfileOpen(true)}
             style={{cursor: 'pointer'}}
           >
             <div className="user-info">
@@ -1872,6 +1873,41 @@ function App() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {isProfileOpen && (
+          <m.div
+            className="profile-modal-layer"
+            initial={shouldReduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+          >
+            <m.div className="profile-modal-backdrop" onClick={() => setIsProfileOpen(false)} />
+            <m.div
+              className="profile-modal glass-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Личный кабинет"
+              initial={shouldReduceMotion ? false : { opacity: 0, y: 14, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button className="profile-modal-close btn btn-icon" type="button" title="Закрыть" onClick={() => setIsProfileOpen(false)}>
+                ×
+              </button>
+              <ProfilePanel
+                currentUser={currentUser}
+                users={users}
+                setUsers={setUsers}
+                setCurrentUser={setCurrentUser}
+              />
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>
+
       <div className="main-area">
         {activeView === 'map' && (
           <aside className="glass-panel sidebar-left">
@@ -1981,16 +2017,6 @@ function App() {
 
         <main className="glass-panel main-content" onClick={handleMapBackgroundClick}>
           
-          {/* PROFILE VIEW */}
-          {activeView === 'profile' && (
-            <ProfilePanel
-              currentUser={currentUser}
-              users={users}
-              setUsers={setUsers}
-              setCurrentUser={setCurrentUser}
-            />
-          )}
-
           {/* ADMIN VIEW */}
           {activeView === 'admin' && canManageOrganizationStaff && (
             <>

@@ -215,6 +215,10 @@ body::before {
 .user-profile:hover {
   background: rgba(255, 255, 255, 0.05);
 }
+.user-profile.active {
+  background: rgba(216, 157, 66, 0.12);
+  border-color: rgba(216, 157, 66, 0.42);
+}
 .user-info {
   display: flex;
   flex-direction: column;
@@ -673,6 +677,43 @@ body::before {
   padding: 1.5rem;
   overflow-y: auto;
   flex: 1;
+}
+.profile-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+.profile-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 9, 7, 0.58);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.profile-modal {
+  position: relative;
+  width: min(560px, calc(100vw - 2rem));
+  max-height: min(760px, calc(100dvh - 2rem));
+  z-index: 1;
+  box-shadow: var(--shadow-lg);
+}
+.profile-modal .panel-header {
+  padding-right: 4rem;
+}
+.profile-modal .panel-content {
+  max-width: none !important;
+  padding: 1.25rem;
+}
+.profile-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  font-size: 1.45rem;
+  line-height: 1;
 }
 
 .project-overview {
