@@ -24,6 +24,10 @@ async function run() {
         name TEXT,
         phone TEXT,
         telegram TEXT,
+        telegram_chat_id TEXT,
+        telegram_link_code TEXT,
+        telegram_link_code_expires_at TIMESTAMP WITH TIME ZONE,
+        telegram_linked_at TIMESTAMP WITH TIME ZONE,
         role TEXT DEFAULT 'Сотрудник', 
         is_super_admin BOOLEAN NOT NULL DEFAULT false,
         avatar_color TEXT DEFAULT '#3b82f6',
@@ -37,6 +41,12 @@ async function run() {
 
       ALTER TABLE profiles
       ADD COLUMN IF NOT EXISTS telegram TEXT;
+
+      ALTER TABLE profiles
+      ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT,
+      ADD COLUMN IF NOT EXISTS telegram_link_code TEXT,
+      ADD COLUMN IF NOT EXISTS telegram_link_code_expires_at TIMESTAMP WITH TIME ZONE,
+      ADD COLUMN IF NOT EXISTS telegram_linked_at TIMESTAMP WITH TIME ZONE;
 
       ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 

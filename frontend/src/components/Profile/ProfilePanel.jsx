@@ -9,6 +9,9 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
   const [profileTelegram, setProfileTelegram] = useState(currentUser.telegram || '');
   const [profileAvatarColor, setProfileAvatarColor] = useState(currentUser.avatar_color || '#3b82f6');
   const [profileAvatarUrl, setProfileAvatarUrl] = useState(currentUser.avatar_url || '');
+  const [telegramLinkCode, setTelegramLinkCode] = useState(currentUser.telegram_link_code || '');
+  const [telegramLinkExpiresAt, setTelegramLinkExpiresAt] = useState(currentUser.telegram_link_code_expires_at || '');
+  const [isTelegramLinkLoading, setIsTelegramLinkLoading] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [profileUserId, setProfileUserId] = useState(currentUser.id);
@@ -21,6 +24,9 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
     setProfileTelegram(currentUser.telegram || '');
     setProfileAvatarColor(currentUser.avatar_color || '#3b82f6');
     setProfileAvatarUrl(currentUser.avatar_url || '');
+    setTelegramLinkCode(currentUser.telegram_link_code || '');
+    setTelegramLinkExpiresAt(currentUser.telegram_link_code_expires_at || '');
+    setIsTelegramLinkLoading(false);
     setNewPassword('');
     setNewPasswordConfirm('');
   }
@@ -120,6 +126,33 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
     setProfilePhone(formatPhone(e.target.value));
   };
 
+  const handleCreateTelegramLinkCode = async () => {
+    setIsTelegramLinkLoading(true);
+    const { data, error } = await supabase.functions.invoke('create-telegram-link-code', {
+      body: {}
+    });
+    setIsTelegramLinkLoading(false);
+
+    if (error) {
+      alert('Ошибка создания кода Telegram: ' + error.message);
+      return;
+    }
+
+    setTelegramLinkCode(data.code);
+    setTelegramLinkExpiresAt(data.expiresAt);
+    if (data.profile) {
+      const updatedProfile = { ...currentUser, ...data.profile };
+      setCurrentUser(updatedProfile);
+      setUsers(users.map(user => user.id === currentUser.id ? { ...user, ...data.profile } : user));
+    }
+  };
+
+  const isTelegramLinked = Boolean(currentUser.telegram_chat_id);
+  const telegramLinkCommand = telegramLinkCode ? `/start ${telegramLinkCode}` : '';
+  const telegramLinkExpiresText = telegramLinkExpiresAt
+    ? new Date(telegramLinkExpiresAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    : '';
+
   return (
     <>
       <div className="panel-header"><h2>Личный кабинет</h2></div>
@@ -154,6 +187,25 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
               onChange={e => setProfileTelegram(e.target.value.replace('@', ''))} 
               placeholder="username" 
             />
+          </div>
+          <div className={`telegram-link-card ${isTelegramLinked ? 'linked' : ''}`}>
+            <div>
+              <strong>{isTelegramLinked ? 'Личный Telegram привязан' : 'Привязка личного Telegram'}</strong>
+              <p>
+                {isTelegramLinked
+                  ? 'Уведомления смогут приходить в личный чат с ботом, если для вас включён канал Telegram.'
+                  : 'Получите код, откройте корпоративного бота и отправьте ему команду с кодом.'}
+              </p>
+            </div>
+            <button className="btn" type="button" onClick={handleCreateTelegramLinkCode} disabled={isTelegramLinkLoading}>
+              {isTelegramLinkLoading ? 'Готовлю код...' : 'Получить код'}
+            </button>
+            {telegramLinkCommand && (
+              <div className="telegram-link-command">
+                <span>{telegramLinkCommand}</span>
+                <small>{telegramLinkExpiresText ? `Действует до ${telegramLinkExpiresText}` : 'Код действует 15 минут'}</small>
+              </div>
+            )}
           </div>
         </div>
         <div className="detail-section">

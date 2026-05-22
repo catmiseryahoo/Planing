@@ -21,6 +21,7 @@ type Profile = {
   email: string | null;
   name: string | null;
   telegram: string | null;
+  telegram_chat_id: string | null;
   notification_channels: Record<string, boolean> | null;
 };
 
@@ -230,7 +231,7 @@ Deno.serve(async (req) => {
       .single<Organization>(),
     adminClient
       .from('profiles')
-      .select('id, email, name, telegram, notification_channels')
+      .select('id, email, name, telegram, telegram_chat_id, notification_channels')
       .eq('id', message.author_id)
       .single<Profile>(),
   ]);
@@ -247,7 +248,7 @@ Deno.serve(async (req) => {
   const { data: recipients, error: recipientsError } = recipientIds.length
     ? await adminClient
       .from('profiles')
-      .select('id, email, name, telegram, notification_channels')
+      .select('id, email, name, telegram, telegram_chat_id, notification_channels')
       .in('id', recipientIds)
       .returns<Profile[]>()
     : { data: [], error: null };
@@ -284,9 +285,18 @@ Deno.serve(async (req) => {
 
   const telegramChannel = channels.telegram || {};
   const telegramDestination = String(telegramChannel.destination || '').trim();
+  const personalTelegramRecipients = (recipients || [])
+    .filter((recipient) => Boolean(recipient.notification_channels?.telegram && recipient.telegram_chat_id))
+    .map((recipient) => ({
+      id: recipient.id,
+      name: recipient.name || recipient.email || recipient.telegram || recipient.id,
+      chatId: recipient.telegram_chat_id as string,
+    }));
+
+  const telegramResults: Record<string, unknown> = {};
   if (telegramChannel.enabled && telegramDestination) {
     if (!telegramBotToken) {
-      results.telegram = { status: 'skipped', reason: 'TELEGRAM_BOT_TOKEN is not configured' };
+      telegramResults.organization = { status: 'skipped', reason: 'TELEGRAM_BOT_TOKEN is not configured' };
     } else {
       try {
         await sendTelegramNotification({
@@ -294,14 +304,39 @@ Deno.serve(async (req) => {
           chatId: telegramDestination,
           text,
         });
-        results.telegram = { status: 'sent', destination: telegramDestination };
+        telegramResults.organization = { status: 'sent', destination: telegramDestination };
       } catch (error) {
-        results.telegram = { status: 'failed', reason: error instanceof Error ? error.message : String(error) };
+        telegramResults.organization = { status: 'failed', reason: error instanceof Error ? error.message : String(error) };
       }
     }
   } else {
-    results.telegram = { status: 'skipped', reason: 'Telegram channel is disabled or destination is empty' };
+    telegramResults.organization = { status: 'skipped', reason: 'Telegram channel is disabled or destination is empty' };
   }
+
+  if (telegramChannel.enabled && personalTelegramRecipients.length > 0) {
+    if (!telegramBotToken) {
+      telegramResults.personal = { status: 'skipped', reason: 'TELEGRAM_BOT_TOKEN is not configured' };
+    } else {
+      const settledResults = await Promise.allSettled(
+        personalTelegramRecipients.map((recipient) =>
+          sendTelegramNotification({
+            token: telegramBotToken,
+            chatId: recipient.chatId,
+            text,
+          })
+        )
+      );
+      telegramResults.personal = {
+        status: settledResults.some((item) => item.status === 'fulfilled') ? 'sent' : 'failed',
+        sent: settledResults.filter((item) => item.status === 'fulfilled').length,
+        failed: settledResults.filter((item) => item.status === 'rejected').length,
+      };
+    }
+  } else {
+    telegramResults.personal = { status: 'skipped', reason: 'No linked Telegram recipients' };
+  }
+
+  results.telegram = telegramResults;
 
   const emailChannel = channels.email || {};
   const emailRecipients = (recipients || [])
