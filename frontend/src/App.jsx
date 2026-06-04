@@ -31,6 +31,74 @@ const countByTaskId = (items) => {
   }, {});
 };
 
+const buildAuthProfileFallback = (authUser) => {
+  const email = authUser?.email?.trim().toLowerCase() || '';
+  return {
+    id: authUser?.id,
+    email,
+    name: authUser?.user_metadata?.name || authUser?.user_metadata?.full_name || email || 'Пользователь',
+    role: 'Сотрудник',
+    avatar_color: '#3b82f6',
+    notification_channels: { telegram: false, whatsapp: false, email: true },
+    is_super_admin: false
+  };
+};
+
+const syncSessionProfile = async (authUser) => {
+  const fallbackProfile = buildAuthProfileFallback(authUser);
+
+  const { data: ownProfile, error: ownProfileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', authUser.id)
+    .maybeSingle();
+
+  if (ownProfile) {
+    return { profile: ownProfile, isFallback: false };
+  }
+
+  if (!ownProfileError) {
+    const { data: createdProfile, error: createProfileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: fallbackProfile.id,
+        email: fallbackProfile.email,
+        name: fallbackProfile.name,
+        role: fallbackProfile.role,
+        avatar_color: fallbackProfile.avatar_color,
+        notification_channels: fallbackProfile.notification_channels
+      })
+      .select()
+      .single();
+
+    if (createdProfile) {
+      return { profile: createdProfile, isFallback: false };
+    }
+
+    console.warn('Direct profile creation failed, trying Edge Function.', createProfileError);
+  } else {
+    console.warn('Direct profile lookup failed, trying Edge Function.', ownProfileError);
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('sync-own-profile', {
+      body: {}
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (data?.profile) {
+      return { profile: data.profile, isFallback: false };
+    }
+  } catch (error) {
+    console.warn('Edge profile sync failed, using auth session fallback.', error);
+  }
+
+  return { profile: fallbackProfile, isFallback: true };
+};
+
 const getDateOnly = (dateString) => {
   if (!dateString) return null;
   const date = new Date(`${dateString}T00:00:00`);
@@ -531,15 +599,7 @@ function App() {
     setIsDataLoading(true);
     setProfileSyncError('');
     try {
-      const { data: syncedProfileData, error: syncedProfileError } = await supabase.functions.invoke('sync-own-profile', {
-        body: {}
-      });
-
-      if (syncedProfileError) {
-        throw new Error(syncedProfileError.message);
-      }
-
-      const syncedProfile = syncedProfileData?.profile || null;
+      const { profile: syncedProfile, isFallback: isProfileFallback } = await syncSessionProfile(session.user);
       let siteMessagesQuery = supabase
         .from('site_messages')
         .select('*')
@@ -611,6 +671,9 @@ function App() {
       const me = nextUsers.find(u => u.id === session.user.id) || syncedProfile;
       if (me) {
         setCurrentUser(me);
+        if (isProfileFallback) {
+          setProfileSyncError('Профиль временно взят из авторизации. Проверьте подключение к Supabase, если данные сотрудника неполные.');
+        }
       } else {
         setProfileSyncError('Профиль пользователя не найден после синхронизации.');
       }
