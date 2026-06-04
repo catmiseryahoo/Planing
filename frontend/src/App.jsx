@@ -351,6 +351,7 @@ function App() {
   const [siteMessages, setSiteMessages] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [profileSyncError, setProfileSyncError] = useState('');
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
   const [messengerText, setMessengerText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -528,7 +529,17 @@ function App() {
   const fetchData = useCallback(async (preferredOrganizationId = activeOrganizationId) => {
     if (!session) return;
     setIsDataLoading(true);
+    setProfileSyncError('');
     try {
+      const { data: syncedProfileData, error: syncedProfileError } = await supabase.functions.invoke('sync-own-profile', {
+        body: {}
+      });
+
+      if (syncedProfileError) {
+        throw new Error(syncedProfileError.message);
+      }
+
+      const syncedProfile = syncedProfileData?.profile || null;
       let siteMessagesQuery = supabase
         .from('site_messages')
         .select('*')
@@ -574,7 +585,16 @@ function App() {
       setOrganizationMembers(organizationMembersRes.data || []);
       setStages(stagesRes.data || []);
       setTasks(tasksWithIndicators);
-      setUsers(profilesRes.data || []);
+      const fetchedProfiles = profilesRes.data || [];
+      const nextUsers = syncedProfile
+        ? (
+          fetchedProfiles.some(user => user.id === syncedProfile.id)
+            ? fetchedProfiles.map(user => user.id === syncedProfile.id ? { ...user, ...syncedProfile } : user)
+            : [syncedProfile, ...fetchedProfiles]
+        )
+        : fetchedProfiles;
+
+      setUsers(nextUsers);
       setTaskFiles(filesRes.data || []);
       setProjectMembers(membersRes.data || []);
       setProjectLogs(logsRes.data || []);
@@ -588,12 +608,15 @@ function App() {
           : nextOrganizationProjects[0]?.id || null
       ));
 
-      const me = profilesRes.data?.find(u => u.id === session.user.id);
+      const me = nextUsers.find(u => u.id === session.user.id) || syncedProfile;
       if (me) {
         setCurrentUser(me);
+      } else {
+        setProfileSyncError('Профиль пользователя не найден после синхронизации.');
       }
     } catch (error) {
       console.error(error);
+      setProfileSyncError(error instanceof Error ? error.message : 'Не удалось синхронизировать профиль.');
     } finally {
       setIsDataLoading(false);
     }
@@ -779,6 +802,19 @@ function App() {
 
   if (!session) {
     return <AuthScreen />;
+  }
+
+  if (!isDataLoading && !currentUser && profileSyncError) {
+    return (
+      <div style={{padding:'2rem', color:'var(--text-primary)', display: 'grid', gap: '1rem', maxWidth: 520}}>
+        <strong>Не удалось синхронизировать профиль</strong>
+        <span style={{color: 'var(--text-secondary)'}}>{profileSyncError}</span>
+        <div style={{display: 'flex', gap: '0.75rem', flexWrap: 'wrap'}}>
+          <button className="btn btn-primary" onClick={() => fetchData(activeOrganizationId)}>Повторить</button>
+          <button className="btn" onClick={handleLogout}>Выйти</button>
+        </div>
+      </div>
+    );
   }
 
   if (isDataLoading || !currentUser) {
