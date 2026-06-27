@@ -44,32 +44,110 @@ const buildAuthProfileFallback = (authUser) => {
   };
 };
 
+const withTimeout = (promise, timeoutMs, message) => {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+};
+
+const runSupabaseRequest = (request, message, timeoutMs = 12000) =>
+  withTimeout(Promise.resolve(request), timeoutMs, message);
+
+const loadWorkspaceData = async (requests) => {
+  const entries = await Promise.all(
+    requests.map(async ({ key, label, request, fallback = [], timeoutMs = 7000 }) => {
+      try {
+        const response = await runSupabaseRequest(request, `${label}: таймаут`, timeoutMs);
+        if (response.error) {
+          console.warn(`${label} load failed.`, response.error);
+          return [key, { data: fallback, error: response.error, label }];
+        }
+
+        return [key, { data: response.data || fallback, error: null, label }];
+      } catch (error) {
+        console.warn(`${label} load timed out.`, error);
+        return [key, { data: fallback, error, label }];
+      }
+    })
+  );
+
+  return Object.fromEntries(entries);
+};
+
+const getLoadErrorMessage = (error) => {
+  if (!error) return '';
+  if (error.message) return error.message;
+  if (error.details) return error.details;
+  if (error.hint) return error.hint;
+  if (error.code) return error.code;
+  return String(error);
+};
+
+const clearStoredAuthSession = () => {
+  try {
+    window.localStorage.removeItem('sb-wqfpksyemvaxncsqwuzm-auth-token');
+  } catch {
+    // Local session reset should keep working even when storage is unavailable.
+  }
+};
+
 const syncSessionProfile = async (authUser) => {
   const fallbackProfile = buildAuthProfileFallback(authUser);
+  let ownProfile;
+  let ownProfileError;
 
-  const { data: ownProfile, error: ownProfileError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', authUser.id)
-    .maybeSingle();
+  try {
+    const profileResponse = await runSupabaseRequest(
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle(),
+      'Supabase не ответил на запрос профиля.',
+      6000
+    );
+    ownProfile = profileResponse.data;
+    ownProfileError = profileResponse.error;
+  } catch (error) {
+    ownProfileError = error;
+    console.warn('Direct profile lookup timed out, trying Edge Function.', error);
+  }
 
   if (ownProfile) {
     return { profile: ownProfile, isFallback: false };
   }
 
   if (!ownProfileError) {
-    const { data: createdProfile, error: createProfileError } = await supabase
-      .from('profiles')
-      .insert({
-        id: fallbackProfile.id,
-        email: fallbackProfile.email,
-        name: fallbackProfile.name,
-        role: fallbackProfile.role,
-        avatar_color: fallbackProfile.avatar_color,
-        notification_channels: fallbackProfile.notification_channels
-      })
-      .select()
-      .single();
+    let createdProfile;
+    let createProfileError;
+
+    try {
+      const createProfileResponse = await runSupabaseRequest(
+        supabase
+          .from('profiles')
+          .insert({
+            id: fallbackProfile.id,
+            email: fallbackProfile.email,
+            name: fallbackProfile.name,
+            role: fallbackProfile.role,
+            avatar_color: fallbackProfile.avatar_color,
+            notification_channels: fallbackProfile.notification_channels
+          })
+          .select()
+          .single(),
+        'Supabase не ответил на создание профиля.',
+        6000
+      );
+      createdProfile = createProfileResponse.data;
+      createProfileError = createProfileResponse.error;
+    } catch (error) {
+      createProfileError = error;
+    }
 
     if (createdProfile) {
       return { profile: createdProfile, isFallback: false };
@@ -81,9 +159,13 @@ const syncSessionProfile = async (authUser) => {
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('sync-own-profile', {
-      body: {}
-    });
+    const { data, error } = await runSupabaseRequest(
+      supabase.functions.invoke('sync-own-profile', {
+        body: {}
+      }),
+      'Supabase Edge Function sync-own-profile не ответила.',
+      6000
+    );
 
     if (error) {
       throw error;
@@ -420,6 +502,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [profileSyncError, setProfileSyncError] = useState('');
+  const [dataLoadError, setDataLoadError] = useState('');
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
   const [messengerText, setMessengerText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -520,16 +603,66 @@ function App() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let isMounted = true;
+
+    const loadSession = async () => {
+      try {
+        const {
+          data: { session },
+        } = await runSupabaseRequest(
+          supabase.auth.getSession(),
+          'Supabase не ответил на проверку сессии.',
+          5000
+        );
+
+        if (!session) {
+          if (!isMounted) return;
+          setSession(null);
+          setIsLoadingAuth(false);
+          return;
+        }
+
+        const {
+          data: { user },
+          error,
+        } = await runSupabaseRequest(
+          supabase.auth.getUser(),
+          'Supabase не подтвердил сессию.',
+          5000
+        );
+
+        if (!isMounted) return;
+
+        if (error || !user) {
+          clearStoredAuthSession();
+          setSession(null);
+        } else {
+          setSession(session);
+        }
+      } catch (error) {
+        console.warn('Auth session validation failed, clearing local session.', error);
+        clearStoredAuthSession();
+        if (isMounted) {
+          setSession(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingAuth(false);
+        }
+      }
+    };
+
+    loadSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION') return;
       setSession(session);
-      setIsLoadingAuth(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -598,8 +731,15 @@ function App() {
     if (!session) return;
     setIsDataLoading(true);
     setProfileSyncError('');
+    setDataLoadError('');
+    let hasSyncedProfile = false;
     try {
       const { profile: syncedProfile, isFallback: isProfileFallback } = await syncSessionProfile(session.user);
+      if (syncedProfile) {
+        hasSyncedProfile = true;
+        setCurrentUser(syncedProfile);
+      }
+
       let siteMessagesQuery = supabase
         .from('site_messages')
         .select('*')
@@ -610,20 +750,89 @@ function App() {
         siteMessagesQuery = siteMessagesQuery.eq('organization_id', preferredOrganizationId);
       }
 
-      const [projectsRes, organizationsRes, organizationMembersRes, stagesRes, tasksRes, profilesRes, subtasksRes, commentsRes, filesRes, membersRes, logsRes, messagesRes] = await Promise.all([
-        supabase.from('projects').select('*').order('created_at', { ascending: true }),
-        supabase.from('organizations').select('*').order('created_at', { ascending: true }),
-        supabase.from('organization_members').select('*'),
-        supabase.from('stages').select('*').order('order', { ascending: true }),
-        supabase.from('tasks').select('*'),
-        supabase.from('profiles').select('*'),
-        supabase.from('subtasks').select('task_id'),
-        supabase.from('comments').select('task_id'),
-        supabase.from('task_files').select('*').order('created_at', { ascending: false }),
-        supabase.from('project_members').select('*'),
-        supabase.from('project_logs').select('*').order('created_at', { ascending: false }).limit(300),
-        siteMessagesQuery
+      const workspaceData = await loadWorkspaceData([
+        {
+          key: 'projects',
+          label: 'Проекты',
+          request: supabase.from('projects').select('*').order('created_at', { ascending: true })
+        },
+        {
+          key: 'organizations',
+          label: 'Организации',
+          request: supabase.from('organizations').select('*').order('created_at', { ascending: true })
+        },
+        {
+          key: 'organizationMembers',
+          label: 'Участники организаций',
+          request: supabase.from('organization_members').select('*')
+        },
+        {
+          key: 'stages',
+          label: 'Этапы',
+          request: supabase.from('stages').select('*').order('order', { ascending: true })
+        },
+        {
+          key: 'tasks',
+          label: 'Задачи',
+          request: supabase.from('tasks').select('*')
+        },
+        {
+          key: 'profiles',
+          label: 'Профили сотрудников',
+          request: supabase.from('profiles').select('*')
+        },
+        {
+          key: 'subtasks',
+          label: 'Подзадачи',
+          request: supabase.from('subtasks').select('task_id')
+        },
+        {
+          key: 'comments',
+          label: 'Комментарии',
+          request: supabase.from('comments').select('task_id')
+        },
+        {
+          key: 'files',
+          label: 'Файлы задач',
+          request: supabase.from('task_files').select('*').order('created_at', { ascending: false })
+        },
+        {
+          key: 'members',
+          label: 'Участники проектов',
+          request: supabase.from('project_members').select('*')
+        },
+        {
+          key: 'logs',
+          label: 'Журнал проекта',
+          request: supabase.from('project_logs').select('*').order('created_at', { ascending: false }).limit(300)
+        },
+        {
+          key: 'messages',
+          label: 'Сообщения',
+          request: siteMessagesQuery
+        }
       ]);
+
+      const {
+        projects: projectsRes,
+        organizations: organizationsRes,
+        organizationMembers: organizationMembersRes,
+        stages: stagesRes,
+        tasks: tasksRes,
+        profiles: profilesRes,
+        subtasks: subtasksRes,
+        comments: commentsRes,
+        files: filesRes,
+        members: membersRes,
+        logs: logsRes,
+        messages: messagesRes
+      } = workspaceData;
+      const failedSections = Object.values(workspaceData)
+        .filter(result => result.error)
+        .map(result => {
+          const message = getLoadErrorMessage(result.error);
+          return message ? `${result.label} (${message})` : result.label;
+        });
 
       const subtaskCounts = countByTaskId(subtasksRes.data);
       const commentCounts = countByTaskId(commentsRes.data);
@@ -671,6 +880,9 @@ function App() {
       const me = nextUsers.find(u => u.id === session.user.id) || syncedProfile;
       if (me) {
         setCurrentUser(me);
+        if (failedSections.length) {
+          setDataLoadError(`Часть данных не загрузилась: ${failedSections.join(', ')}. Можно продолжать работу и повторить загрузку.`);
+        }
         if (isProfileFallback) {
           setProfileSyncError('Профиль временно взят из авторизации. Проверьте подключение к Supabase, если данные сотрудника неполные.');
         }
@@ -679,7 +891,11 @@ function App() {
       }
     } catch (error) {
       console.error(error);
-      setProfileSyncError(error instanceof Error ? error.message : 'Не удалось синхронизировать профиль.');
+      if (hasSyncedProfile) {
+        setDataLoadError(error instanceof Error ? error.message : 'Не удалось загрузить данные рабочего пространства.');
+      } else {
+        setProfileSyncError(error instanceof Error ? error.message : 'Не удалось синхронизировать профиль.');
+      }
     } finally {
       setIsDataLoading(false);
     }
@@ -824,7 +1040,22 @@ function App() {
   }, [getConstrainedPanelPosition, isDraggingPanel, panelDragOffset]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    setSession(null);
+    setCurrentUser(null);
+    setProfileSyncError('');
+    setDataLoadError('');
+
+    clearStoredAuthSession();
+
+    try {
+      await runSupabaseRequest(
+        supabase.auth.signOut(),
+        'Supabase не ответил на выход из аккаунта.',
+        3000
+      );
+    } catch (error) {
+      console.warn('Remote sign-out failed after local session reset.', error);
+    }
   };
 
   const handleCreateUser = async (e) => {
@@ -880,7 +1111,7 @@ function App() {
     );
   }
 
-  if (isDataLoading || !currentUser) {
+  if (!currentUser) {
     return <div style={{padding:'2rem', color:'var(--text-primary)'}}>Синхронизация профиля...</div>;
   }
 
@@ -1845,6 +2076,16 @@ function App() {
         </div>
       </header>
 
+      {dataLoadError && (
+        <div className="workspace-error-banner" role="status">
+          <span>{dataLoadError}</span>
+          <div className="workspace-error-actions">
+            <button className="btn" type="button" onClick={() => fetchData(activeOrganizationId)}>Повторить</button>
+            <button className="btn" type="button" onClick={handleLogout}>Выйти</button>
+          </div>
+        </div>
+      )}
+
       <AnimatePresence>
         {isMessengerOpen && (
         <m.div
@@ -2560,7 +2801,10 @@ function App() {
                                       </svg>
                                     </button>
                                   )}
-                                  <div className="task-title">{task.name}</div>
+                                  <div className="task-title">
+                                    <span className="task-stage-marker" aria-hidden="true" />
+                                    <span>{task.name}</span>
+                                  </div>
                                   {(task.file_count > 0 || task.subtask_count > 0 || task.comment_count > 0 || task.is_modified) && (
                                     <div className="task-indicators">
                                       {task.file_count > 0 && (
