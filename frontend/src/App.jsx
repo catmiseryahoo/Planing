@@ -1176,7 +1176,7 @@ function App() {
 
     const createdUserId = data?.user?.id;
     if (activeOrganizationId && createdUserId) {
-      const organizationRole = newUserRole === 'Менеджер проектов' ? 'project_manager' : 'member';
+      const organizationRole = newUserRole === 'Администратор' ? 'admin' : (newUserRole === 'Менеджер проектов' ? 'project_manager' : 'member');
       await supabase
         .from('organization_members')
         .upsert([{ organization_id: activeOrganizationId, user_id: createdUserId, role: organizationRole }], { onConflict: 'organization_id,user_id' });
@@ -2774,6 +2774,13 @@ function App() {
                           });
 
                           if (!error) {
+                             const orgRole = role === 'Администратор' ? 'admin' : (role === 'Менеджер проектов' ? 'project_manager' : 'member');
+                             await supabase
+                               .from('organization_members')
+                               .update({ role: orgRole })
+                               .eq('organization_id', activeOrganizationId)
+                               .eq('user_id', id);
+
                              const updatedUser = { ...adminEditingUser, ...(profileData?.profile || {}), email: nextEmail };
                              setUsers(users.map(u => u.id === id ? updatedUser : u));
                              if (id === currentUser.id) setCurrentUser({...currentUser, ...updatedUser});
