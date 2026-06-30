@@ -779,11 +779,22 @@ body::before {
 }
 .profile-modal-close {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 0.85rem;
+  right: 1.25rem;
   z-index: 2;
   font-size: 1.45rem;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
   line-height: 1;
+}
+
+.profile-modal .detail-section > input.edit-select {
+  width: 100%;
 }
 
 .project-overview {

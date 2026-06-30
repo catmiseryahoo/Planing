@@ -229,13 +229,26 @@ export default function ProfilePanel({ currentUser, users, setUsers, setCurrentU
               </div>
             )}
             <div style={{flex: 1}}>
-              <input type="file" accept="image/*" onChange={(e) => {
-                 if (e.target.files && e.target.files[0]) {
-                    const reader = new FileReader();
-                    reader.onload = (ev) => { setProfileAvatarUrl(ev.target.result); };
-                    reader.readAsDataURL(e.target.files[0]);
-                 }
-              }} style={{fontSize:'0.8rem'}} />
+              <label className="btn btn-outline" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', padding: '0.4rem 0.75rem', marginBottom: '0.4rem' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <span>Загрузить фото</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => { setProfileAvatarUrl(ev.target.result); };
+                      reader.readAsDataURL(e.target.files[0]);
+                    }
+                  }} 
+                  style={{ display: 'none' }} 
+                />
+              </label>
               <div style={{fontSize:'0.75rem', color:'var(--text-secondary)', marginTop:'0.25rem'}}>Или цвет (если нет фото):</div>
               <div style={{display:'flex', gap:'0.25rem', marginTop:'0.25rem'}}>
                 {['#3b82f6', '#ec4899', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444'].map(color => (
