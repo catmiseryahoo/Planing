@@ -579,7 +579,7 @@ body::before {
 }
 .messenger-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px;
+  grid-template-columns: auto minmax(0, 1fr) 38px;
   align-items: end;
   gap: 0.55rem;
   padding: 0.75rem;
@@ -3159,4 +3159,149 @@ select.edit-select:focus {
     min-height: 0;
     gap: 0.5rem;
   }
+}
+
+/* Visualizations View */
+.project-visualizations-view {
+  padding: 1rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.visualizations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.visualization-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.visualization-card:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.visualization-card.add-new {
+  border-style: dashed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-weight: 500;
+  min-height: 100px;
+}
+
+.visualization-card.add-new:hover {
+  color: var(--accent-blue);
+  background: var(--btn-hover);
+}
+
+.visualization-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.visualization-card-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.visualization-date {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+/* Editor View */
+.visualization-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 1rem;
+}
+
+.visualization-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--panel-bg);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+}
+
+.visualization-editor-header h3 {
+  margin: 0;
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.visualization-editor-body {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0; /* important for flex children to scroll */
+}
+
+.visualization-code-panel,
+.visualization-preview-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.visualization-preview-panel {
+  flex: 1.5; /* Preview slightly larger */
+}
+
+.panel-header {
+  padding: 0.5rem 1rem;
+  background: var(--btn-bg);
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.visualization-textarea {
+  flex: 1;
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', Courier, monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+}
+
+.visualization-iframe {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #ffffff; /* Typically white for HTML renders unless dark mode specifically built in */
 }

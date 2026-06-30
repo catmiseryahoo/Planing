@@ -1,3 +1,6 @@
 .DS_Store
 supabase/.temp/
 .vercel
+.env.local
+.agents/**/node_modules/
+graphify-out/

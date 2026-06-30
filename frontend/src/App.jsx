@@ -5,6 +5,8 @@ import AuthScreen from './components/Auth/AuthScreen';
 import ProfilePanel from './components/Profile/ProfilePanel';
 import TaskSidebar from './components/Task/TaskSidebar';
 import GanttChart from './components/Map/GanttChart';
+import MessengerPanel from './components/Messenger/MessengerPanel';
+import ErrorBoundary from './components/Messenger/ErrorBoundary';
 import { formatPhone, isCompletePhone } from './utils/phone';
 import './index.css';
 
@@ -55,26 +57,53 @@ const withTimeout = (promise, timeoutMs, message) => {
   });
 };
 
-const runSupabaseRequest = (request, message, timeoutMs = 12000) =>
-  withTimeout(Promise.resolve(request), timeoutMs, message);
+const runSupabaseRequest = async (request, message, timeoutMs = 12000, retries = 1) => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await withTimeout(Promise.resolve(request), timeoutMs, message);
+      if (response && response.error) {
+        const status = response.error.status;
+        const isRetryable = !status || status >= 500 || status === 429 || status === 408;
+        if (isRetryable && attempt < retries) {
+          console.warn(`Request failed with status ${status || 'network'}. Retrying attempt ${attempt + 1}...`);
+          await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+          continue;
+        }
+      }
+      return response;
+    } catch (error) {
+      if (attempt < retries) {
+        console.warn(`Request timed out or failed: ${error.message || error}. Retrying attempt ${attempt + 1}...`);
+        await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+};
 
 const loadWorkspaceData = async (requests) => {
-  const entries = await Promise.all(
-    requests.map(async ({ key, label, request, fallback = [], timeoutMs = 7000 }) => {
-      try {
-        const response = await runSupabaseRequest(request, `${label}: таймаут`, timeoutMs);
-        if (response.error) {
-          console.warn(`${label} load failed.`, response.error);
-          return [key, { data: fallback, error: response.error, label }];
+  const entries = [];
+  const batchSize = 3;
+  for (let i = 0; i < requests.length; i += batchSize) {
+    const batch = requests.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(async ({ key, label, request, fallback = [], timeoutMs = 12000 }) => {
+        try {
+          const response = await runSupabaseRequest(request, `${label}: таймаут`, timeoutMs);
+          if (response.error) {
+            console.warn(`${label} load failed.`, response.error);
+            return [key, { data: fallback, error: response.error, label }];
+          }
+          return [key, { data: response.data || fallback, error: null, label }];
+        } catch (error) {
+          console.warn(`${label} load timed out.`, error);
+          return [key, { data: fallback, error, label }];
         }
-
-        return [key, { data: response.data || fallback, error: null, label }];
-      } catch (error) {
-        console.warn(`${label} load timed out.`, error);
-        return [key, { data: fallback, error, label }];
-      }
-    })
-  );
+      })
+    );
+    entries.push(...results);
+  }
 
   return Object.fromEntries(entries);
 };
@@ -525,7 +554,11 @@ function App() {
   const [activeOrganizationId, setActiveOrganizationId] = useState(null);
   const [activeView, setActiveView] = useState('map'); // map, admin
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [activeProjectView, setActiveProjectView] = useState('kanban'); // kanban, gantt
+  const [activeProjectView, setActiveProjectView] = useState('kanban'); // kanban, gantt, visualizations
+  const [visualizations, setVisualizations] = useState([]);
+  const [selectedVisualization, setSelectedVisualization] = useState(null);
+  const [isCodeCollapsed, setIsCodeCollapsed] = useState(false);
+  const [isDesktopView, setIsDesktopView] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [editingProjectName, setEditingProjectName] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
@@ -807,6 +840,11 @@ function App() {
           request: supabase.from('project_logs').select('*').order('created_at', { ascending: false }).limit(300)
         },
         {
+          key: 'visualizations',
+          label: 'Визуализации',
+          request: supabase.from('project_visualizations').select('*').order('created_at', { ascending: false })
+        },
+        {
           key: 'messages',
           label: 'Сообщения',
           request: siteMessagesQuery
@@ -825,7 +863,8 @@ function App() {
         files: filesRes,
         members: membersRes,
         logs: logsRes,
-        messages: messagesRes
+        messages: messagesRes,
+        visualizations: visualizationsRes
       } = workspaceData;
       const failedSections = Object.values(workspaceData)
         .filter(result => result.error)
@@ -867,6 +906,7 @@ function App() {
       setTaskFiles(filesRes.data || []);
       setProjectMembers(membersRes.data || []);
       setProjectLogs(logsRes.data || []);
+      setVisualizations(visualizationsRes.data || []);
       setSiteMessages(messagesRes.data || []);
       latestMessageAtRef.current = messagesRes.data?.at(-1)?.created_at || '';
 
@@ -1141,6 +1181,7 @@ function App() {
   const activeProjectMembers = projectMembers.filter(member => member.project_id === activeProjectId);
   const activeProjectLogs = projectLogs.filter(log => log.project_id === activeProjectId);
   const isProjectLead = activeProjectMembers.some(member => member.user_id === currentUser.id && member.role === 'Руководитель проекта');
+  const canManageTasks = canManageOrganization || isProjectLead || activeProjectMembers.some(member => member.user_id === currentUser?.id && member.role === 'Менеджер проекта');
   const visibleProjectMembers = activeProjectMembers.filter(member => {
     const user = users.find(item => item.id === member.user_id);
     return isSuperAdmin || !user?.is_super_admin;
@@ -1725,6 +1766,54 @@ function App() {
     }
   };
 
+  const handleCreateVisualization = async () => {
+    if (!canManageTasks) return;
+    const name = prompt('Название новой визуализации:', 'Новый дашборд');
+    if (!name) return;
+    
+    const newVis = {
+      project_id: activeProjectId,
+      name,
+      content: '<h1>Привет, мир!</h1>\n<p>Здесь можно писать HTML, CSS и JS.</p>',
+      created_by: currentUser.id
+    };
+    
+    const { data, error } = await supabase.from('project_visualizations').insert([newVis]).select();
+    if (error) {
+      alert('Ошибка создания: ' + error.message);
+      return;
+    }
+    if (data && data.length > 0) {
+      setVisualizations([data[0], ...visualizations]);
+      setSelectedVisualization(data[0]);
+    }
+  };
+
+  const handleDeleteVisualization = async (visId) => {
+    if (!canManageTasks) return;
+    if (!window.confirm('Точно удалить эту визуализацию?')) return;
+    
+    const { error } = await supabase.from('project_visualizations').delete().eq('id', visId);
+    if (error) {
+      alert('Ошибка удаления: ' + error.message);
+      return;
+    }
+    setVisualizations(visualizations.filter(v => v.id !== visId));
+    if (selectedVisualization?.id === visId) {
+      setSelectedVisualization(null);
+    }
+  };
+
+  const handleUpdateVisualization = async (visId, content) => {
+    if (!canManageTasks) return;
+    const { error } = await supabase.from('project_visualizations').update({ content, updated_at: new Date().toISOString() }).eq('id', visId);
+    if (error) {
+      alert('Ошибка сохранения: ' + error.message);
+      return;
+    }
+    setVisualizations(visualizations.map(v => v.id === visId ? { ...v, content, updated_at: new Date().toISOString() } : v));
+  };
+
   const handleDeleteTask = async (task) => {
     if (!canManageOrganization && !isProjectLead) return;
     if (!window.confirm(`Удалить задачу "${task.name}"?`)) return;
@@ -2088,128 +2177,25 @@ function App() {
 
       <AnimatePresence>
         {isMessengerOpen && (
-        <m.div
-          className="messenger-layer"
-          initial={shouldReduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
-        >
-          <m.div className="messenger-backdrop" onClick={() => setIsMessengerOpen(false)} />
-          <m.div
-            className="messenger-popover glass-panel"
-            style={{ left: messengerWindow.x, top: messengerWindow.y }}
-            initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.96, y: -8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.98, y: -6 }}
-            transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.7 }}
-          >
-          <div className="messenger-header" onMouseDown={handleMessengerDragStart}>
-            <div>
-              <h3>Мессенджер</h3>
-              <span>{conversationTitle}</span>
-            </div>
-            <button className="btn btn-icon close-panel-btn" title="Закрыть" onClick={() => setIsMessengerOpen(false)}>×</button>
-          </div>
-          <div className="messenger-layout" style={{ height: messengerChatSize.height }}>
-            <aside className="messenger-sidebar">
-              <div className="messenger-sidebar-title">Диалоги</div>
-              <button
-                type="button"
-                className={`messenger-dialog-item ${selectedMessengerUserIds.length === 0 ? 'active' : ''}`}
-                disabled={!canUseProjectChat}
-                onClick={() => setSelectedMessengerUserIds([])}
-                title={canUseProjectChat ? 'Общий чат активного проекта' : 'Вы не участник активного проекта'}
-              >
-                <div className="messenger-dialog-avatar project-chat">#</div>
-                <div className="messenger-dialog-info">
-                  <strong>Общий чат проекта</strong>
-                  <span>{activeProject?.name || 'Проект не выбран'}</span>
-                </div>
-              </button>
-              <div className="messenger-sidebar-title muted">Сотрудники</div>
-              <div className="messenger-user-list">
-                {messengerUsers.map(user => (
-                <button
-                  key={user.id}
-                  type="button"
-                  className={`messenger-dialog-item ${selectedMessengerUserIds.includes(user.id) ? 'active' : ''}`}
-                  onClick={(e) => handleMessengerRecipientSelect(user.id, e.shiftKey)}
-                  title={user.email}
-                >
-                  <div className="messenger-dialog-avatar" style={{backgroundColor: user.avatar_color || '#3b82f6', backgroundImage: user.avatar_url ? `url(${user.avatar_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}}>
-                    {!user.avatar_url && getUserInitials(user.name || user.email)}
-                  </div>
-                  <div className="messenger-dialog-info">
-                    <strong>{user.name || user.email}</strong>
-                    <span>{selectedMessengerUserIds.includes(user.id) ? 'Выбран' : user.email}</span>
-                  </div>
-                </button>
-                ))}
-              </div>
-            </aside>
-            <section className="messenger-chat" style={{ width: messengerChatSize.width }}>
-              <div className="messenger-chat-title">
-                <strong>{conversationTitle}</strong>
-                <span>{selectedMessengerUsers.length ? `${selectedMessengerUsers.length + 1} участников` : 'Проектный чат'}</span>
-              </div>
-              <div className="messenger-messages">
-                {conversationMessages.length > 0 ? conversationMessages.map(message => {
-                  const author = getUser(message.author_id);
-                  const isMine = message.author_id === currentUser.id;
-                  return (
-                    <div key={message.id} className={`messenger-message ${isMine ? 'mine' : ''}`}>
-                      {!isMine && (
-                        <div className="avatar sm messenger-avatar" style={{backgroundColor: author?.avatar_color || '#3b82f6', backgroundImage: author?.avatar_url ? `url(${author.avatar_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center'}}>
-                          {!author?.avatar_url && getUserInitials(author?.name || author?.email)}
-                        </div>
-                      )}
-                      <div className="messenger-bubble">
-                        <div className="messenger-meta">
-                          <strong>{isMine ? 'Вы' : author?.name || author?.email || 'Пользователь'}</strong>
-                          <span>{new Date(message.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <div className="messenger-text">{message.body}</div>
-                      </div>
-                    </div>
-                  );
-                }) : (
-                  <div className="messenger-empty">
-                    {selectedMessengerUserIds.length === 0 && !canUseProjectChat
-                      ? 'Общий чат доступен только участникам активного проекта.'
-                      : 'Пока нет сообщений в этой беседе.'}
-                  </div>
-                )}
-                <div ref={messengerEndRef} />
-              </div>
-              <form className="messenger-form" onSubmit={handleSendSiteMessage}>
-                <textarea
-                  ref={messengerTextareaRef}
-                  value={messengerText}
-                  onChange={(e) => setMessengerText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendSiteMessage(e);
-                    }
-                  }}
-                  placeholder="Написать сообщение..."
-                  rows={1}
-                />
-                <button className="messenger-send-btn" type="submit" title="Отправить" disabled={!messengerText.trim() || isSendingMessage || (selectedMessengerUserIds.length === 0 && !canUseProjectChat)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M22 2 11 13"></path>
-                    <path d="m22 2-7 20-4-9-9-4Z"></path>
-                  </svg>
-                </button>
-              </form>
-            </section>
-          </div>
-          <button className="messenger-resize-handle" title="Изменить размер" onMouseDown={handleMessengerResizeStart}>
-            <span></span>
-          </button>
-          </m.div>
-        </m.div>
+          <ErrorBoundary>
+            <MessengerPanel
+              currentUser={currentUser}
+              users={users}
+              activeProjectId={activeProjectId}
+              activeProject={activeProject}
+              activeOrganizationId={activeOrganizationId}
+              siteMessages={siteMessages}
+              setSiteMessages={setSiteMessages}
+              isMessengerOpen={isMessengerOpen}
+              setIsMessengerOpen={setIsMessengerOpen}
+              shouldReduceMotion={shouldReduceMotion}
+              supabase={supabase}
+              canManageOrganization={canManageOrganization}
+              currentOrganizationRole={currentOrganizationRole}
+              activeProjectMembers={projectMembers}
+              visibleOrganizationUsers={visibleOrganizationUsers}
+            />
+          </ErrorBoundary>
         )}
       </AnimatePresence>
 
@@ -2702,6 +2688,7 @@ function App() {
                   <button className={`view-tab ${activeProjectView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveProjectView('kanban')}>Канбан (Карта)</button>
                   <button className={`view-tab ${activeProjectView === 'gantt' ? 'active' : ''}`} onClick={() => setActiveProjectView('gantt')}>Диаграмма Ганта</button>
                   <button className={`view-tab ${activeProjectView === 'files' ? 'active' : ''}`} onClick={() => setActiveProjectView('files')}>Файлы</button>
+                  <button className={`view-tab ${activeProjectView === 'visualizations' ? 'active' : ''}`} onClick={() => setActiveProjectView('visualizations')}>Визуализации</button>
                   <button className={`view-tab ${activeProjectView === 'members' ? 'active' : ''}`} onClick={() => setActiveProjectView('members')}>Сотрудники</button>
                   <button className={`view-tab ${activeProjectView === 'logs' ? 'active' : ''}`} onClick={() => setActiveProjectView('logs')}>Logs</button>
                 </div>
@@ -2874,6 +2861,106 @@ function App() {
                     stages={projectStages} 
                     onSelectTask={(task) => handleSelectTask(task)} 
                   />
+                )}
+                {activeProjectView === 'visualizations' && (
+                  <div className="project-visualizations-view">
+                    {!selectedVisualization ? (
+                      <div className="visualizations-grid">
+                        {visualizations.filter(v => v.project_id === activeProjectId).map(vis => (
+                          <div key={vis.id} className="visualization-card" onClick={() => setSelectedVisualization(vis)}>
+                            <div className="visualization-card-header">
+                              <h4>{vis.name}</h4>
+                              {canManageTasks && (
+                                <button className="btn btn-icon danger" onClick={(e) => { e.stopPropagation(); handleDeleteVisualization(vis.id); }}>
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M3 6h18" />
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                            <div className="visualization-card-body">
+                              <span className="visualization-date">{formatDate(vis.created_at)}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {canManageTasks && (
+                          <div className="visualization-card add-new" onClick={handleCreateVisualization}>
+                            <span>+ Создать визуализацию</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="visualization-editor">
+                        <div className="visualization-editor-header" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button className="btn" onClick={() => setSelectedVisualization(null)}>← Назад</button>
+                          <h3 style={{ marginRight: 'auto', fontSize: '1rem' }}>{selectedVisualization.name}</h3>
+                          
+                          <button 
+                            className={`btn ${isCodeCollapsed ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => setIsCodeCollapsed(!isCodeCollapsed)}
+                          >
+                            {isCodeCollapsed ? 'Показать код' : 'Свернуть код'}
+                          </button>
+                          
+                          <button 
+                            className={`btn ${isDesktopView ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => setIsDesktopView(!isDesktopView)}
+                          >
+                            {isDesktopView ? '100% ширина' : 'Десктоп (1200px)'}
+                          </button>
+
+                          <button 
+                            className="btn btn-outline"
+                            onClick={() => {
+                              const blob = new Blob([selectedVisualization.content], { type: 'text/html' });
+                              const url = URL.createObjectURL(blob);
+                              window.open(url, '_blank');
+                            }}
+                          >
+                            Открыть в новом окне
+                          </button>
+                          
+                          {canManageTasks && (
+                            <button className="btn btn-primary" onClick={() => handleUpdateVisualization(selectedVisualization.id, selectedVisualization.content)}>
+                              Сохранить
+                            </button>
+                          )}
+                        </div>
+                        <div className="visualization-editor-body">
+                          {canManageTasks && !isCodeCollapsed ? (
+                            <div className="visualization-code-panel" style={{ flex: 1 }}>
+                              <div className="panel-header">HTML / CSS / JS</div>
+                              <textarea 
+                                className="visualization-textarea"
+                                value={selectedVisualization.content}
+                                onChange={(e) => setSelectedVisualization({...selectedVisualization, content: e.target.value})}
+                                spellCheck="false"
+                              />
+                            </div>
+                          ) : null}
+                          <div className="visualization-preview-panel" style={{ flex: isCodeCollapsed ? 1 : 1.5 }}>
+                            <div className="panel-header">Превью (Sandbox)</div>
+                            <div style={{ flex: 1, overflow: 'auto', background: '#fff', position: 'relative' }}>
+                              <iframe 
+                                className="visualization-iframe"
+                                title={selectedVisualization.name}
+                                srcDoc={selectedVisualization.content}
+                                sandbox="allow-scripts"
+                                style={{ 
+                                  width: isDesktopView ? '1200px' : '100%', 
+                                  height: '100%', 
+                                  minHeight: '100%', 
+                                  border: 'none',
+                                  display: 'block'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
                 {activeProjectView === 'files' && (
                   <div className="project-files-view">
