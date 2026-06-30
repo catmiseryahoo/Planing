@@ -18,6 +18,23 @@ const statusLabels = {
   'overdue': 'Просрочено'
 };
 
+const AVAILABLE_PERMISSIONS = [
+  { key: 'create_projects', label: 'Создание проектов' },
+  { key: 'manage_projects', label: 'Управление проектами (удаление/переименование)' },
+  { key: 'manage_staff', label: 'Управление сотрудниками' },
+  { key: 'manage_stages', label: 'Управление этапами (колонками)' },
+  { key: 'manage_tasks', label: 'Управление задачами' },
+  { key: 'manage_visualizations', label: 'Управление визуализациями' }
+];
+
+const CUSTOMIZABLE_ROLES = [
+  'Администратор',
+  'Менеджер проектов',
+  'Дизайнер',
+  'Разработчик',
+  'Сотрудник'
+];
+
 const formatDate = (dateString) => {
   if (!dateString) return 'Не задан';
   const date = new Date(dateString);
@@ -529,7 +546,9 @@ function App() {
   const [projectLogs, setProjectLogs] = useState([]);
   const [siteMessages, setSiteMessages] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [rolePermissions, setRolePermissions] = useState([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const [profileSyncError, setProfileSyncError] = useState('');
   const [dataLoadError, setDataLoadError] = useState('');
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
@@ -587,6 +606,7 @@ function App() {
   const [isClockZoneMenuOpen, setIsClockZoneMenuOpen] = useState(false);
 
   const [adminEditingUser, setAdminEditingUser] = useState(null);
+  const [adminActiveTab, setAdminActiveTab] = useState('users');
   const [adminEditPassword, setAdminEditPassword] = useState('');
   const [adminEditPasswordConfirm, setAdminEditPasswordConfirm] = useState('');
 
@@ -846,6 +866,11 @@ function App() {
           request: supabase.from('project_visualizations').select('*').order('created_at', { ascending: false })
         },
         {
+          key: 'rolePermissions',
+          label: 'Настройки прав ролей',
+          request: supabase.from('role_permissions').select('*')
+        },
+        {
           key: 'messages',
           label: 'Сообщения',
           request: siteMessagesQuery
@@ -865,7 +890,8 @@ function App() {
         members: membersRes,
         logs: logsRes,
         messages: messagesRes,
-        visualizations: visualizationsRes
+        visualizations: visualizationsRes,
+        rolePermissions: rolePermissionsRes
       } = workspaceData;
       const failedSections = Object.values(workspaceData)
         .filter(result => result.error)
@@ -909,6 +935,7 @@ function App() {
       setProjectLogs(logsRes.data || []);
       setVisualizations(visualizationsRes.data || []);
       setSiteMessages(messagesRes.data || []);
+      setRolePermissions(rolePermissionsRes.data || []);
       latestMessageAtRef.current = messagesRes.data?.at(-1)?.created_at || '';
 
       setActiveOrganizationId(nextOrganizationId);
@@ -1197,9 +1224,28 @@ function App() {
     currentUser.is_super_admin
     || (currentUser.role === 'Администратор' && firstOrganization?.owner_id === currentUser.id)
   );
-  const canManageOrganization = isSuperAdmin || ['owner', 'admin'].includes(currentOrganizationRole);
-  const canCreateProjects = isSuperAdmin || ['owner', 'admin', 'project_manager'].includes(currentOrganizationRole);
-  const canManageOrganizationStaff = isSuperAdmin || ['owner', 'admin', 'project_manager'].includes(currentOrganizationRole);
+
+  const hasPermission = (role, permissionName, defaultValue) => {
+    if (isSuperAdmin || currentOrganizationRole === 'owner') return true;
+    const rolePerm = rolePermissions.find(p => p.organization_id === activeOrganizationId && p.role === role);
+    if (rolePerm && rolePerm.permissions && rolePerm.permissions[permissionName] !== undefined) {
+      return rolePerm.permissions[permissionName];
+    }
+    return defaultValue;
+  };
+
+  const canManageOrganization = isSuperAdmin 
+    || ['owner', 'admin', 'project_manager'].includes(currentOrganizationRole)
+    || hasPermission(currentUser?.role, 'manage_projects', false);
+
+  const canCreateProjects = isSuperAdmin 
+    || ['owner', 'admin', 'project_manager'].includes(currentOrganizationRole)
+    || hasPermission(currentUser?.role, 'create_projects', false);
+
+  const canManageOrganizationStaff = isSuperAdmin 
+    || ['owner', 'admin', 'project_manager'].includes(currentOrganizationRole)
+    || hasPermission(currentUser?.role, 'manage_staff', false);
+
   const visibleOrganizationUsers = organizationUsers.filter(user => isSuperAdmin || !user.is_super_admin);
   const visibleProjects = projects.filter(project => project.organization_id === activeOrganizationId);
   const projectStages = stages.filter(s => s.project_id === activeProjectId).sort((a, b) => a.order - b.order);
@@ -1211,14 +1257,29 @@ function App() {
   const activeProjectMembers = projectMembers.filter(member => member.project_id === activeProjectId);
   const activeProjectLogs = projectLogs.filter(log => log.project_id === activeProjectId);
   const isProjectLead = activeProjectMembers.some(member => member.user_id === currentUser.id && member.role === 'Руководитель проекта');
-  const canManageTasks = canManageOrganization || isProjectLead || activeProjectMembers.some(member => member.user_id === currentUser?.id && member.role === 'Менеджер проекта');
+
+  const canManageStages = canManageOrganization 
+    || isProjectLead 
+    || hasPermission(currentUser?.role, 'manage_stages', false);
+
+  const canManageTasks = canManageOrganization 
+    || isProjectLead 
+    || activeProjectMembers.some(member => member.user_id === currentUser?.id && member.role === 'Менеджер проекта') 
+    || hasPermission(currentUser?.role, 'manage_tasks', true);
+
+  const canManageVisualizations = canManageOrganization 
+    || isProjectLead 
+    || hasPermission(currentUser?.role, 'manage_visualizations', false);
+
   const visibleProjectMembers = activeProjectMembers.filter(member => {
     const user = users.find(item => item.id === member.user_id);
     return isSuperAdmin || !user?.is_super_admin;
   });
-  const canManageProjectMembers = canManageOrganization || isProjectLead;
+  
+  const canManageProjectMembers = canManageOrganization || isProjectLead || hasPermission(currentUser?.role, 'manage_staff', false);
   const canConfigureNotificationChannels = canManageProjectMembers || canManageOrganizationStaff;
-  const canRenameProject = (projectId) => canManageOrganization || projectMembers.some(member =>
+  
+  const canRenameProject = (projectId) => canManageOrganization || hasPermission(currentUser?.role, 'manage_projects', false) || projectMembers.some(member =>
     member.project_id === projectId &&
     member.user_id === currentUser?.id &&
     member.role === 'Руководитель проекта'
@@ -1797,7 +1858,7 @@ function App() {
   };
 
   const handleCreateVisualization = async () => {
-    if (!canManageTasks) return;
+    if (!canManageVisualizations) return;
     const name = prompt('Название новой визуализации:', 'Новый дашборд');
     if (!name) return;
     
@@ -1820,7 +1881,7 @@ function App() {
   };
 
   const handleDeleteVisualization = async (visId) => {
-    if (!canManageTasks) return;
+    if (!canManageVisualizations) return;
     if (!window.confirm('Точно удалить эту визуализацию?')) return;
     
     const { error } = await supabase.from('project_visualizations').delete().eq('id', visId);
@@ -1835,13 +1896,74 @@ function App() {
   };
 
   const handleUpdateVisualization = async (visId, content) => {
-    if (!canManageTasks) return;
+    if (!canManageVisualizations) return;
     const { error } = await supabase.from('project_visualizations').update({ content, updated_at: new Date().toISOString() }).eq('id', visId);
     if (error) {
       alert('Ошибка сохранения: ' + error.message);
       return;
     }
     setVisualizations(visualizations.map(v => v.id === visId ? { ...v, content, updated_at: new Date().toISOString() } : v));
+  };
+
+  const handleTogglePermission = (role, permKey) => {
+    const existing = rolePermissions.find(p => p.organization_id === activeOrganizationId && p.role === role);
+    
+    let nextPermissions = {};
+    if (existing && existing.permissions) {
+      nextPermissions = { ...existing.permissions };
+    } else {
+      const isManagerOrAdmin = ['Администратор', 'Менеджер проектов'].includes(role);
+      nextPermissions = {
+        create_projects: isManagerOrAdmin,
+        manage_projects: isManagerOrAdmin,
+        manage_staff: isManagerOrAdmin,
+        manage_stages: isManagerOrAdmin,
+        manage_tasks: true,
+        manage_visualizations: isManagerOrAdmin
+      };
+    }
+    
+    nextPermissions[permKey] = !nextPermissions[permKey];
+    
+    if (existing) {
+      setRolePermissions(rolePermissions.map(p => 
+        (p.organization_id === activeOrganizationId && p.role === role)
+          ? { ...p, permissions: nextPermissions }
+          : p
+      ));
+    } else {
+      const newPermRecord = {
+        organization_id: activeOrganizationId,
+        role,
+        permissions: nextPermissions
+      };
+      setRolePermissions([...rolePermissions, newPermRecord]);
+    }
+  };
+
+  const handleSaveRolePermissions = async () => {
+    const orgPermissions = rolePermissions.filter(p => p.organization_id === activeOrganizationId);
+    
+    setIsSavingPermissions(true);
+    try {
+      const { error } = await supabase
+        .from('role_permissions')
+        .upsert(orgPermissions.map(({ organization_id, role, permissions }) => ({
+          organization_id,
+          role,
+          permissions
+        })), { onConflict: 'organization_id,role' });
+
+      if (error) {
+        alert('Ошибка при сохранении прав: ' + error.message);
+      } else {
+        alert('Права ролей успешно сохранены!');
+      }
+    } catch (err) {
+      alert('Произошла непредвиденная ошибка: ' + err.message);
+    } finally {
+      setIsSavingPermissions(false);
+    }
   };
 
   const handleDeleteTask = async (task) => {
@@ -2382,10 +2504,27 @@ function App() {
           {/* ADMIN VIEW */}
           {activeView === 'admin' && canManageOrganizationStaff && (
             <>
-              <div className="panel-header"><h2>Панель администратора</h2></div>
-              <div className="panel-content" style={{display: 'flex', gap: '2rem'}}>
-                
-                <div style={{flex: 2}}>
+              <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2>Панель администратора</h2>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button 
+                    className={`btn ${adminActiveTab === 'users' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setAdminActiveTab('users')}
+                  >
+                    Сотрудники
+                  </button>
+                  <button 
+                    className={`btn ${adminActiveTab === 'permissions' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setAdminActiveTab('permissions')}
+                  >
+                    Настройка прав
+                  </button>
+                </div>
+              </div>
+              <div className="panel-content" style={{ display: 'block' }}>
+                {adminActiveTab === 'users' && (
+                  <div style={{ display: 'flex', gap: '2rem' }}>
+                    <div style={{flex: 2}}>
 	                  <section className="admin-organization-panel">
 	                    <div>
 	                      <h3>Организации</h3>
@@ -2679,7 +2818,80 @@ function App() {
 	                    <div className="empty-state">Выберите сотрудника слева, чтобы настроить каналы уведомлений или удалить его из системы.</div>
 	                  )}
                 </div>
+                  </div>
+                )}
                 
+                {adminActiveTab === 'permissions' && (
+                  <div className="permissions-settings-panel" style={{ padding: '1rem 0' }}>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <h3>Настройка прав должностей</h3>
+                      <p style={{ color: 'var(--text-secondary)' }}>
+                        Здесь вы можете гибко настроить права доступа для каждой роли в текущей организации.
+                        Суперадминистраторы и Владельцы организации всегда имеют полные права.
+                      </p>
+                    </div>
+
+                    <div className="table-responsive" style={{ overflowX: 'auto', background: 'var(--panel-bg)', borderRadius: '8px', border: '1px solid var(--panel-border)', marginBottom: '1.5rem' }}>
+                      <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid var(--panel-border)', background: 'var(--sidebar-bg)' }}>
+                            <th style={{ textAlign: 'left', padding: '1rem' }}>Право доступа</th>
+                            {CUSTOMIZABLE_ROLES.map(role => (
+                              <th key={role} style={{ textAlign: 'center', padding: '1rem' }}>{role}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {AVAILABLE_PERMISSIONS.map(perm => (
+                            <tr key={perm.key} style={{ borderBottom: '1px solid var(--panel-border)' }}>
+                              <td style={{ padding: '1rem', fontWeight: '500' }}>
+                                {perm.label}
+                              </td>
+                              {CUSTOMIZABLE_ROLES.map(role => {
+                                const rolePerm = rolePermissions.find(p => p.organization_id === activeOrganizationId && p.role === role);
+                                let isChecked = false;
+                                if (rolePerm && rolePerm.permissions && rolePerm.permissions[perm.key] !== undefined) {
+                                  isChecked = rolePerm.permissions[perm.key];
+                                } else {
+                                  const isManagerOrAdmin = ['Администратор', 'Менеджер проектов'].includes(role);
+                                  isChecked = perm.key === 'manage_tasks' ? true : isManagerOrAdmin;
+                                }
+                                return (
+                                  <td key={role} style={{ textAlign: 'center', padding: '1rem' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={isChecked}
+                                      onChange={() => handleTogglePermission(role, perm.key)}
+                                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                    />
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={handleSaveRolePermissions}
+                        disabled={isSavingPermissions}
+                      >
+                        {isSavingPermissions ? 'Сохранение...' : 'Сохранить права'}
+                      </button>
+                      <button 
+                        className="btn btn-outline" 
+                        onClick={() => {
+                          fetchData();
+                        }}
+                      >
+                        Сбросить изменения
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -2906,7 +3118,7 @@ function App() {
                           <div key={vis.id} className="visualization-card" onClick={() => setSelectedVisualization(vis)}>
                             <div className="visualization-card-header">
                               <h4>{vis.name}</h4>
-                              {canManageTasks && (
+                              {canManageVisualizations && (
                                 <button className="btn btn-icon danger" onClick={(e) => { e.stopPropagation(); handleDeleteVisualization(vis.id); }}>
                                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M3 6h18" />
@@ -2920,7 +3132,7 @@ function App() {
                             </div>
                           </div>
                         ))}
-                        {canManageTasks && (
+                        {canManageVisualizations && (
                           <div className="visualization-card add-new" onClick={handleCreateVisualization}>
                             <span>+ Создать визуализацию</span>
                           </div>
@@ -2957,14 +3169,14 @@ function App() {
                             Открыть в новом окне
                           </button>
                           
-                          {canManageTasks && (
+                          {canManageVisualizations && (
                             <button className="btn btn-primary" onClick={() => handleUpdateVisualization(selectedVisualization.id, selectedVisualization.content)}>
                               Сохранить
                             </button>
                           )}
                         </div>
                         <div className="visualization-editor-body">
-                          {canManageTasks && !isCodeCollapsed ? (
+                          {canManageVisualizations && !isCodeCollapsed ? (
                             <div className="visualization-code-panel" style={{ flex: 1 }}>
                               <div className="panel-header">HTML / CSS / JS</div>
                               <textarea 
@@ -3244,7 +3456,7 @@ function App() {
                 taskId={selectedTask.id} 
                 onClose={() => setSelectedTaskId(null)} 
                 currentUser={currentUser} 
-                users={users} 
+                users={visibleOrganizationUsers} 
                 stages={stages} 
                 onTaskUpdated={(updatedTask, indicatorPatch = {}, logDetails = null) => {
                   setTasks(tasks.map(t => t.id === updatedTask.id ? { ...t, ...updatedTask, ...indicatorPatch } : t));
