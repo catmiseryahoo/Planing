@@ -777,15 +777,15 @@ body::before {
   max-width: none !important;
   padding: 1.25rem;
 }
-.profile-modal-close {
+.profile-modal .profile-modal-close {
   position: absolute;
-  top: 0.85rem;
+  top: 1rem;
   right: 1.25rem;
   z-index: 2;
   font-size: 1.45rem;
   width: 32px;
   height: 32px;
-  padding: 0;
+  padding: 0 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3284,7 +3284,8 @@ select.edit-select:focus {
   flex: 1.5; /* Preview slightly larger */
 }
 
-.panel-header {
+.visualization-code-panel .panel-header,
+.visualization-preview-panel .panel-header {
   padding: 0.5rem 1rem;
   background: var(--btn-bg);
   border-bottom: 1px solid var(--panel-border);
