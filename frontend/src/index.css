@@ -766,9 +766,24 @@ body::before {
 .profile-modal {
   position: relative;
   width: min(560px, calc(100vw - 2rem));
-  max-height: min(760px, calc(100dvh - 2rem));
+  max-height: min(960px, calc(100dvh - 2rem));
+  min-width: 380px;
+  min-height: 300px;
   z-index: 1;
   box-shadow: var(--shadow-lg);
+  resize: both;
+  overflow: hidden;
+}
+
+.modal-resize-handle-visual {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+  z-index: 10;
+  color: var(--text-tertiary);
 }
 .profile-modal .panel-header {
   padding-right: 4rem;

@@ -595,6 +595,7 @@ function App() {
   const clockMenuRef = useRef(null);
   const latestMessageAtRef = useRef('');
   const skipProjectNameSaveRef = useRef(false);
+  const profileModalRef = useRef(null);
 
   const getConstrainedMessengerLayout = useCallback((position, size) => {
     if (window.innerWidth <= 900) {
@@ -1011,6 +1012,35 @@ function App() {
 
     return () => window.removeEventListener('resize', handleResize);
   }, [getConstrainedMessengerLayout, getConstrainedPanelPosition, messengerChatSize]);
+
+  useEffect(() => {
+    if (!isProfileOpen) return;
+
+    const savedWidth = localStorage.getItem('profile-modal-width');
+    const savedHeight = localStorage.getItem('profile-modal-height');
+    if (savedWidth && savedHeight && profileModalRef.current) {
+      profileModalRef.current.style.width = savedWidth;
+      profileModalRef.current.style.height = savedHeight;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          localStorage.setItem('profile-modal-width', entry.target.style.width || `${width}px`);
+          localStorage.setItem('profile-modal-height', entry.target.style.height || `${height}px`);
+        }
+      }
+    });
+
+    if (profileModalRef.current) {
+      observer.observe(profileModalRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isProfileOpen]);
 
   useEffect(() => {
     if (!isDraggingMessenger && !isResizingMessenger) return undefined;
@@ -2210,6 +2240,7 @@ function App() {
           >
             <m.div className="profile-modal-backdrop" onClick={() => setIsProfileOpen(false)} />
             <m.div
+              ref={profileModalRef}
               className="profile-modal glass-panel"
               role="dialog"
               aria-modal="true"
@@ -2229,6 +2260,11 @@ function App() {
                 setUsers={setUsers}
                 setCurrentUser={setCurrentUser}
               />
+              <div className="modal-resize-handle-visual">
+                <svg width="10" height="10" viewBox="0 0 10 10">
+                  <path d="M10,0 L0,10 M10,3 L3,10 M10,6 L6,10" stroke="currentColor" strokeWidth="1.5" opacity="0.35" />
+                </svg>
+              </div>
             </m.div>
           </m.div>
         )}
