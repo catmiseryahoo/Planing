@@ -552,6 +552,7 @@ function App() {
   const [profileSyncError, setProfileSyncError] = useState('');
   const [dataLoadError, setDataLoadError] = useState('');
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
+  const [hoveredTooltip, setHoveredTooltip] = useState(null);
   const [messengerText, setMessengerText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [selectedMessengerUserIds, setSelectedMessengerUserIds] = useState([]);
@@ -3507,6 +3508,131 @@ function App() {
               />
            </m.div>
         )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {hoveredTooltip && (
+            <m.div
+              initial={{ opacity: 0, scale: 0.95, y: hoveredTooltip.rect.top < 150 ? 5 : -5 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: hoveredTooltip.rect.top < 150 ? 5 : -5 }}
+              transition={{ duration: 0.12 }}
+              style={{
+                position: 'fixed',
+                top: hoveredTooltip.rect.top < 150 ? hoveredTooltip.rect.bottom + 8 : hoveredTooltip.rect.top - 8,
+                left: hoveredTooltip.rect.left + hoveredTooltip.rect.width / 2,
+                transform: hoveredTooltip.rect.top < 150 ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+                zIndex: 99999,
+                pointerEvents: 'none',
+                padding: '0.65rem 0.9rem',
+                borderRadius: '8px',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.4)',
+                border: '1px solid var(--panel-border)',
+                minWidth: '150px',
+                maxWidth: '280px',
+                fontSize: '0.78rem',
+                color: 'var(--text-primary)',
+                backgroundColor: 'rgba(20, 20, 20, 0.92)',
+                backdropFilter: 'blur(10px)',
+                lineHeight: '1.4'
+              }}
+            >
+              {hoveredTooltip.type === 'assignee' && (
+                <div>
+                  <div style={{ fontWeight: '600', color: 'var(--accent-color, #3b82f6)' }}>{hoveredTooltip.data.name}</div>
+                  {hoveredTooltip.data.role && <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>{hoveredTooltip.data.role}</div>}
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>{hoveredTooltip.data.email}</div>
+                </div>
+              )}
+              {hoveredTooltip.type === 'subtasks' && (
+                <div>
+                  <div style={{ fontWeight: '600', marginBottom: '0.35rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.15rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Подзадачи:</span>
+                    {!hoveredTooltip.isLoading && (
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        {hoveredTooltip.data.filter(t => t.is_completed).length}/{hoveredTooltip.data.length}
+                      </span>
+                    )}
+                  </div>
+                  {hoveredTooltip.isLoading ? (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Загрузка...</div>
+                  ) : hoveredTooltip.data.length === 0 ? (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Нет подзадач</div>
+                  ) : (
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      {hoveredTooltip.data.map((item, idx) => (
+                        <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', textDecoration: item.is_completed ? 'line-through' : 'none', color: item.is_completed ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
+                          <span style={{ color: item.is_completed ? '#10b981' : 'var(--text-secondary)', fontWeight: 'bold' }}>
+                            {item.is_completed ? '✓' : '○'}
+                          </span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }}>{item.text || item.name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {hoveredTooltip.type === 'comments' && (
+                <div>
+                  <div style={{ fontWeight: '600', marginBottom: '0.35rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.15rem' }}>Последние комментарии:</div>
+                  {hoveredTooltip.isLoading ? (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Загрузка...</div>
+                  ) : hoveredTooltip.data.length === 0 ? (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Нет комментариев</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {hoveredTooltip.data.slice(-3).reverse().map((item, idx) => {
+                        const author = item.author || users.find(u => u.id === item.author_id);
+                        return (
+                          <div key={idx} style={{ fontSize: '0.7rem', borderBottom: idx < Math.min(3, hoveredTooltip.data.length) - 1 ? '1px dashed rgba(255,255,255,0.05)' : 'none', paddingBottom: '0.25rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontWeight: '500', marginBottom: '0.05rem' }}>
+                              <span style={{ color: 'var(--accent-color, #3b82f6)' }}>{author?.name || author?.email || 'Система'}</span>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.6rem' }}>{formatDate(item.created_at)}</span>
+                            </div>
+                            <div style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>{item.text}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+              {hoveredTooltip.type === 'attachments' && (
+                <div>
+                  <div style={{ fontWeight: '600', marginBottom: '0.35rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.15rem' }}>Вложения:</div>
+                  {hoveredTooltip.data.length === 0 ? (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Вложений нет</div>
+                  ) : (
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      {hoveredTooltip.data.map((file, idx) => (
+                        <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem' }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: 'var(--text-secondary)' }}>
+                            <path d="M21.44 11.05 12 20.49a6 6 0 0 1-8.49-8.49l9.44-9.44a4 4 0 0 1 5.66 5.66l-9.44 9.44a2 2 0 0 1-2.83-2.83l8.49-8.49" />
+                          </svg>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px', color: 'var(--text-primary)' }}>
+                            {file.file_name || file.name}
+                          </span>
+                          {file.file_size && <span style={{ color: 'var(--text-secondary)', fontSize: '0.6rem' }}>({formatFileSize(file.file_size)})</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {hoveredTooltip.type === 'date' && (
+                <div>
+                  <div style={{ fontWeight: '500', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Срок исполнения:</div>
+                  <div style={{ marginTop: '0.15rem', fontWeight: '600', color: 'var(--accent-color, #3b82f6)' }}>{formatDate(hoveredTooltip.data)}</div>
+                </div>
+              )}
+              {hoveredTooltip.type === 'status' && (
+                <div>
+                  <div style={{ fontWeight: '500', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Текущий статус:</div>
+                  <div style={{ marginTop: '0.15rem', fontWeight: '600' }} className={`status-badge-text ${hoveredTooltip.data}`}>{statusLabels[hoveredTooltip.data]}</div>
+                </div>
+              )}
+            </m.div>
+          )}
         </AnimatePresence>
       </div>
     </div>
