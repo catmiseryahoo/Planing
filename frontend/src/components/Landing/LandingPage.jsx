@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { m, LazyMotion, domAnimation } from 'framer-motion';
+import { m, LazyMotion, domAnimation } from 'motion/react';
 import { supabase } from '../../supabaseClient';
 import './landing.css';
 
