@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, LazyMotion, domAnimation, m, useReducedMotion } from 'motion/react';
 import { supabase } from './supabaseClient';
-import AuthScreen from './components/Auth/AuthScreen';
+import LandingPage from './components/Landing/LandingPage';
 import ProfilePanel from './components/Profile/ProfilePanel';
 import TaskSidebar from './components/Task/TaskSidebar';
 import GanttChart from './components/Map/GanttChart';
 import MessengerPanel from './components/Messenger/MessengerPanel';
 import ErrorBoundary from './components/Messenger/ErrorBoundary';
+import SkillsPanel from './components/AI/SkillsPanel';
 import { formatPhone, isCompletePhone } from './utils/phone';
 import './index.css';
 
@@ -552,6 +553,9 @@ function App() {
   const [profileSyncError, setProfileSyncError] = useState('');
   const [dataLoadError, setDataLoadError] = useState('');
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
+  const [isSkillsPanelOpen, setIsSkillsPanelOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMobileOverviewExpanded, setIsMobileOverviewExpanded] = useState(false);
   const [hoveredTooltip, setHoveredTooltip] = useState(null);
   const [messengerText, setMessengerText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -976,6 +980,16 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [fetchData, session]);
 
+  useEffect(() => {
+    let timeoutId;
+    if (isMobileOverviewExpanded) {
+      timeoutId = setTimeout(() => {
+        setIsMobileOverviewExpanded(false);
+      }, 5000);
+    }
+    return () => clearTimeout(timeoutId);
+  }, [isMobileOverviewExpanded]);
+
   const fetchSiteMessages = useCallback(async () => {
     if (!currentUser?.id || !activeOrganizationId) return;
     const { data, error } = await supabase
@@ -1193,7 +1207,7 @@ function App() {
   if (isLoadingAuth) return <div style={{padding:'2rem', color:'var(--text-primary)'}}>Загрузка авторизации...</div>;
 
   if (!session) {
-    return <AuthScreen />;
+    return <LandingPage />;
   }
 
   if (!isDataLoading && !currentUser && profileSyncError) {
@@ -2280,6 +2294,18 @@ function App() {
           )}
 
           <button
+            className={`btn btn-icon ${isSkillsPanelOpen ? 'active' : ''}`}
+            title="AI Planning Skills"
+            aria-label="AI Planning Skills"
+            onClick={() => setIsSkillsPanelOpen(!isSkillsPanelOpen)}
+            style={{ color: isSkillsPanelOpen ? '#f97316' : 'inherit' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+            </svg>
+          </button>
+
+          <button
             className={`btn btn-icon messenger-trigger ${isMessengerOpen ? 'active' : ''} ${hasUnreadMessages ? 'unread' : ''}`}
             title="Мессенджер"
             aria-label="Мессенджер"
@@ -2350,6 +2376,14 @@ function App() {
             />
           </ErrorBoundary>
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        <SkillsPanel 
+          isOpen={isSkillsPanelOpen} 
+          onClose={() => setIsSkillsPanelOpen(false)} 
+          shouldReduceMotion={shouldReduceMotion} 
+        />
       </AnimatePresence>
 
       <AnimatePresence>
@@ -2950,7 +2984,10 @@ function App() {
                 </div>
               </div>
               {activeProject && (
-                <div className="project-overview">
+                <div 
+                  className={`project-overview ${isMobileOverviewExpanded ? 'expanded' : ''}`}
+                  onClick={() => setIsMobileOverviewExpanded(true)}
+                >
                   <div className="project-progress-main">
                     <div className="project-progress-topline">
                       <div>

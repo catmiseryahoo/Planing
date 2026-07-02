@@ -28,3 +28,5 @@ When changing the frontend, use the referenced plugin as a design brief rather t
 - Keep the first screen as the actual planning workspace. Do not turn this app into a marketing landing page.
 - Preserve workflow density: project list, status metrics, map/Gantt surfaces, task panels, messenger, and profile tools should stay scannable and efficient.
 - Verify frontend changes with a local build and, when a dev server is running, a browser check.
+
+- Always format URLs (like http://localhost:5173/) as clickable markdown links (e.g. [http://localhost:5173/](http://localhost:5173/)) so the user doesn't have to copy and paste them.
