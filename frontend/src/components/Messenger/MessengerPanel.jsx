@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { m } from 'motion/react';
 
 const MESSENGER_SIDEBAR_WIDTH = 260;
@@ -36,10 +36,10 @@ export default function MessengerPanel({
   activeProjectMembers,
   visibleOrganizationUsers
 }) {
-  const safeUsers = users || [];
-  const safeSiteMessages = siteMessages || [];
-  const safeVisibleUsers = visibleOrganizationUsers || [];
-  const safeProjectMembers = activeProjectMembers || [];
+  const safeUsers = useMemo(() => users || [], [users]);
+  const safeSiteMessages = useMemo(() => siteMessages || [], [siteMessages]);
+  const safeVisibleUsers = useMemo(() => visibleOrganizationUsers || [], [visibleOrganizationUsers]);
+  const safeProjectMembers = useMemo(() => activeProjectMembers || [], [activeProjectMembers]);
 
   const [messengerText, setMessengerText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);

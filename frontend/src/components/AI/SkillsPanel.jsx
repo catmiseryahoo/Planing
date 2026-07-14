@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { m } from 'framer-motion';
+import { useState } from 'react';
+import { m } from 'motion/react';
 import { supabase } from '../../supabaseClient';
 
 export default function SkillsPanel({ isOpen, onClose, shouldReduceMotion }) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { m, LazyMotion, domAnimation } from 'motion/react';
 import { supabase } from '../../supabaseClient';
 import './landing.css';

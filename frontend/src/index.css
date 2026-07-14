@@ -1363,6 +1363,7 @@ body::before {
   color: #fbbf24;
   border-color: rgba(251, 191, 36, 0.25);
   background: rgba(251, 191, 36, 0.08);
+  animation: blink-indicator 1.5s infinite ease-in-out;
 }
 .task-meta {
   display: flex;
@@ -1604,6 +1605,13 @@ body::before {
   border-radius: 50%;
   background-color: #f59e0b; /* Orange */
   box-shadow: 0 0 4px rgba(245, 158, 11, 0.5);
+  animation: blink-indicator 1.5s infinite ease-in-out;
+}
+
+@keyframes blink-indicator {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
 }
 
 /* Task Edit Forms */

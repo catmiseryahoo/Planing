@@ -31,6 +31,14 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
   const [isDragOverFiles, setIsDragOverFiles] = useState(false);
   const fileInputRef = useRef(null);
 
+  const notifyAssignee = async (targetTaskId, targetAssigneeId) => {
+    if (targetAssigneeId && currentUser?.id !== targetAssigneeId) {
+      await supabase.from('tasks').update({ has_unread_changes: true }).eq('id', targetTaskId);
+      return true;
+    }
+    return false;
+  };
+
   const loadTaskData = useCallback(async (id) => {
     setIsLoading(true);
     const [taskRes, subtasksRes, commentsRes, filesRes] = await Promise.all([
@@ -47,13 +55,21 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
       setEditAssigneeId(taskRes.data.assignee_id || '');
       setEditDate(taskRes.data.date || '');
       setEditDesc(taskRes.data.desc || '');
+
+      if (taskRes.data.has_unread_changes && taskRes.data.assignee_id === currentUser?.id) {
+        supabase.from('tasks').update({ has_unread_changes: false }).eq('id', id).then(() => {
+          if (onTaskUpdated) {
+            onTaskUpdated(taskRes.data, { has_unread_changes: false }, null);
+          }
+        });
+      }
     }
     if (subtasksRes.data) setSubtasks(subtasksRes.data);
     if (commentsRes.data) setComments(commentsRes.data);
     if (filesRes.data) setFiles(filesRes.data);
     
     setIsLoading(false);
-  }, []);
+  }, [currentUser?.id, onTaskUpdated]);
 
   useEffect(() => {
     if (!taskId) return undefined;
@@ -111,11 +127,12 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     const changes = buildTaskChanges(updates);
     const { data, error } = await supabase.from('tasks').update(updates).eq('id', task.id).select();
     if (!error && data) {
+      const unread = await notifyAssignee(task.id, editAssigneeId || task.assignee_id);
       onTaskUpdated(data[0], {
         subtask_count: subtasks.length + (hasPendingSubtask ? 1 : 0),
         comment_count: comments.length + (hasPendingComment ? 1 : 0),
         file_count: files.length,
-        is_modified: true
+        has_unread_changes: unread || task.has_unread_changes
       }, changes.length > 0 ? { changes } : null);
       onClose(); // Закрываем панель после сохранения
     }
@@ -131,7 +148,8 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
     if (!error && data) {
       setSubtasks([...subtasks, data[0]]);
-      onTaskUpdated(task, { subtask_count: subtasks.length + 1, is_modified: true }, {
+      const unread = await notifyAssignee(task.id, task.assignee_id);
+      onTaskUpdated(task, { subtask_count: subtasks.length + 1, has_unread_changes: unread || task.has_unread_changes }, {
         action: 'add_subtask',
         entityType: 'subtask',
         entityId: data[0].id,
@@ -150,7 +168,8 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
     if (!error) {
       setSubtasks(subtasks.map(s => s.id === subtask.id ? { ...s, is_completed: newStatus } : s));
-      onTaskUpdated(task, { is_modified: true }, {
+      const unread = await notifyAssignee(task.id, task.assignee_id);
+      onTaskUpdated(task, { has_unread_changes: unread || task.has_unread_changes }, {
         action: 'update_subtask',
         entityType: 'subtask',
         entityId: subtask.id,
@@ -171,7 +190,8 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     }
     if (!error) {
       setSubtasks(subtasks.filter(s => s.id !== id));
-      onTaskUpdated(task, { subtask_count: Math.max(0, subtasks.length - 1), is_modified: true }, {
+      const unread = await notifyAssignee(task.id, task.assignee_id);
+      onTaskUpdated(task, { subtask_count: Math.max(0, subtasks.length - 1), has_unread_changes: unread || task.has_unread_changes }, {
         action: 'delete_subtask',
         entityType: 'subtask',
         entityId: id,
@@ -200,7 +220,8 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
     const { data, error } = await supabase.from('comments').insert([newComment]).select('*, author:profiles(*)');
     if (!error && data) {
       setComments([...comments, data[0]]);
-      onTaskUpdated(task, { comment_count: comments.length + 1, is_modified: true }, {
+      const unread = await notifyAssignee(task.id, task.assignee_id);
+      onTaskUpdated(task, { comment_count: comments.length + 1, has_unread_changes: unread || task.has_unread_changes }, {
         action: 'add_comment',
         entityType: 'comment',
         entityId: data[0].id,
@@ -248,7 +269,8 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
         if (data?.[0]) {
           setFiles(currentFiles => [...currentFiles, data[0]]);
           onTaskFileAdded(data[0]);
-          onTaskUpdated(task, { file_count: files.length + 1 });
+          const unread = await notifyAssignee(task.id, task.assignee_id);
+          onTaskUpdated(task, { file_count: files.length + 1, has_unread_changes: unread || task.has_unread_changes });
         }
       }
     } catch (error) {
@@ -271,7 +293,8 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
 
     setFiles(files.filter(f => f.id !== file.id));
     onTaskFileDeleted(file.id);
-    onTaskUpdated(task, { file_count: Math.max(0, files.length - 1) });
+    const unread = await notifyAssignee(task.id, task.assignee_id);
+    onTaskUpdated(task, { file_count: Math.max(0, files.length - 1), has_unread_changes: unread || task.has_unread_changes });
   };
 
   const formatFileSize = (size) => {

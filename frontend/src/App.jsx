@@ -246,10 +246,6 @@ const formatFileSize = (size) => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const MESSENGER_SIDEBAR_WIDTH = 260;
-const MESSENGER_HEADER_HEIGHT = 76;
-const MESSENGER_MIN_CHAT_WIDTH = 320;
-const MESSENGER_MIN_CHAT_HEIGHT = 340;
 const TASK_PANEL_WIDTH = 380;
 const FLOATING_WINDOW_MARGIN = 8;
 const CLOCK_TIME_ZONE_STORAGE_KEY = 'orbite-clock-time-zone';
@@ -554,25 +550,8 @@ function App() {
   const [dataLoadError, setDataLoadError] = useState('');
   const [isMessengerOpen, setIsMessengerOpen] = useState(false);
   const [isSkillsPanelOpen, setIsSkillsPanelOpen] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobileOverviewExpanded, setIsMobileOverviewExpanded] = useState(false);
-  const [hoveredTooltip, setHoveredTooltip] = useState(null);
-  const [messengerText, setMessengerText] = useState('');
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [selectedMessengerUserIds, setSelectedMessengerUserIds] = useState([]);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
-  const [messengerWindow, setMessengerWindow] = useState({
-    x: Math.max(16, window.innerWidth - 760),
-    y: 84
-  });
-  const [messengerChatSize, setMessengerChatSize] = useState({
-    width: 470,
-    height: 520
-  });
-  const [isDraggingMessenger, setIsDraggingMessenger] = useState(false);
-  const [isResizingMessenger, setIsResizingMessenger] = useState(false);
-  const [messengerDragOffset, setMessengerDragOffset] = useState({ x: 0, y: 0 });
-  const [messengerResizeStart, setMessengerResizeStart] = useState(null);
 
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [activeOrganizationId, setActiveOrganizationId] = useState(null);
@@ -616,39 +595,10 @@ function App() {
   const [adminEditPasswordConfirm, setAdminEditPasswordConfirm] = useState('');
 
   const messengerEndRef = useRef(null);
-  const messengerTextareaRef = useRef(null);
   const clockMenuRef = useRef(null);
   const latestMessageAtRef = useRef('');
   const skipProjectNameSaveRef = useRef(false);
   const profileModalRef = useRef(null);
-
-  const getConstrainedMessengerLayout = useCallback((position, size) => {
-    if (window.innerWidth <= 900) {
-      return { position, size };
-    }
-
-    const maxChatWidth = Math.max(
-      MESSENGER_MIN_CHAT_WIDTH,
-      window.innerWidth - MESSENGER_SIDEBAR_WIDTH - FLOATING_WINDOW_MARGIN * 3
-    );
-    const nextWidth = Math.min(size.width, maxChatWidth);
-    const totalWidth = MESSENGER_SIDEBAR_WIDTH + nextWidth;
-    const maxX = Math.max(FLOATING_WINDOW_MARGIN, window.innerWidth - totalWidth - FLOATING_WINDOW_MARGIN);
-    const nextX = clamp(position.x, FLOATING_WINDOW_MARGIN, maxX);
-
-    const maxChatHeight = Math.max(
-      MESSENGER_MIN_CHAT_HEIGHT,
-      window.innerHeight - MESSENGER_HEADER_HEIGHT - FLOATING_WINDOW_MARGIN * 2
-    );
-    const nextHeight = Math.min(size.height, maxChatHeight);
-    const maxY = Math.max(FLOATING_WINDOW_MARGIN, window.innerHeight - MESSENGER_HEADER_HEIGHT - nextHeight - FLOATING_WINDOW_MARGIN);
-    const nextY = clamp(position.y, FLOATING_WINDOW_MARGIN, maxY);
-
-    return {
-      position: { x: nextX, y: nextY },
-      size: { width: nextWidth, height: nextHeight }
-    };
-  }, []);
 
   const getConstrainedPanelPosition = useCallback((position) => {
     if (window.innerWidth <= 900) {
@@ -1030,17 +980,6 @@ function App() {
 
   useEffect(() => {
     const handleResize = () => {
-      setMessengerWindow(currentPosition => {
-        const nextLayout = getConstrainedMessengerLayout(currentPosition, messengerChatSize);
-        setMessengerChatSize(currentSize => (
-          currentSize.width === nextLayout.size.width && currentSize.height === nextLayout.size.height
-            ? currentSize
-            : nextLayout.size
-        ));
-        return currentPosition.x === nextLayout.position.x && currentPosition.y === nextLayout.position.y
-          ? currentPosition
-          : nextLayout.position;
-      });
       setPanelPos(currentPosition => {
         const nextPosition = getConstrainedPanelPosition(currentPosition);
         return currentPosition.x === nextPosition.x && currentPosition.y === nextPosition.y
@@ -1053,7 +992,7 @@ function App() {
     handleResize();
 
     return () => window.removeEventListener('resize', handleResize);
-  }, [getConstrainedMessengerLayout, getConstrainedPanelPosition, messengerChatSize]);
+  }, [getConstrainedPanelPosition]);
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -1083,55 +1022,6 @@ function App() {
       observer.disconnect();
     };
   }, [isProfileOpen]);
-
-  useEffect(() => {
-    if (!isDraggingMessenger && !isResizingMessenger) return undefined;
-
-    const handleMouseMove = (e) => {
-      if (isDraggingMessenger) {
-        const nextPosition = {
-          x: e.clientX - messengerDragOffset.x,
-          y: e.clientY - messengerDragOffset.y
-        };
-        setMessengerWindow(getConstrainedMessengerLayout(nextPosition, messengerChatSize).position);
-      }
-
-      if (isResizingMessenger && messengerResizeStart) {
-        const requestedSize = {
-          width: Math.max(MESSENGER_MIN_CHAT_WIDTH, messengerResizeStart.width + e.clientX - messengerResizeStart.mouseX),
-          height: Math.max(MESSENGER_MIN_CHAT_HEIGHT, messengerResizeStart.height + e.clientY - messengerResizeStart.mouseY)
-        };
-        const nextLayout = getConstrainedMessengerLayout(
-          { x: messengerResizeStart.x, y: messengerResizeStart.y },
-          requestedSize
-        );
-        setMessengerWindow(nextLayout.position);
-        setMessengerChatSize(nextLayout.size);
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDraggingMessenger(false);
-      setIsResizingMessenger(false);
-      setMessengerResizeStart(null);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [getConstrainedMessengerLayout, isDraggingMessenger, isResizingMessenger, messengerChatSize, messengerDragOffset, messengerResizeStart]);
-
-  useEffect(() => {
-    const textarea = messengerTextareaRef.current;
-    if (!textarea) return;
-    textarea.style.height = '0px';
-    textarea.style.height = `${textarea.scrollHeight}px`;
-  }, [messengerText]);
-
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -1273,15 +1163,6 @@ function App() {
   const activeProjectLogs = projectLogs.filter(log => log.project_id === activeProjectId);
   const isProjectLead = activeProjectMembers.some(member => member.user_id === currentUser.id && member.role === 'Руководитель проекта');
 
-  const canManageStages = canManageOrganization 
-    || isProjectLead 
-    || hasPermission(currentUser?.role, 'manage_stages', false);
-
-  const canManageTasks = canManageOrganization 
-    || isProjectLead 
-    || activeProjectMembers.some(member => member.user_id === currentUser?.id && member.role === 'Менеджер проекта') 
-    || hasPermission(currentUser?.role, 'manage_tasks', true);
-
   const canManageVisualizations = canManageOrganization 
     || isProjectLead 
     || hasPermission(currentUser?.role, 'manage_visualizations', false);
@@ -1302,65 +1183,6 @@ function App() {
   
   const getUserInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : '?';
   const getUser = (id) => users.find(u => u.id === id);
-  const activeProjectMemberIds = new Set(activeProjectMembers.map(member => member.user_id));
-  const canUseProjectChat = Boolean(activeProjectId) && (
-    activeProjectMemberIds.has(currentUser.id)
-    || canManageOrganization
-    || currentOrganizationRole === 'project_manager'
-  );
-  const messengerUsers = visibleOrganizationUsers.filter(user => user.id !== currentUser.id);
-  const selectedMessengerUsers = selectedMessengerUserIds
-    .map(id => getUser(id))
-    .filter(Boolean);
-  const conversationParticipantIds = [currentUser.id, ...selectedMessengerUserIds].sort();
-  const conversationTitle = selectedMessengerUsers.length
-    ? selectedMessengerUsers.map(user => user.name || user.email).join(', ')
-    : `Общий чат${activeProject ? `: ${activeProject.name}` : ''}`;
-  const getMessageParticipants = (message) => Array
-    .from(new Set([message.author_id, ...(message.recipient_ids || [])]))
-    .filter(Boolean)
-    .sort();
-  const isSameParticipantSet = (left, right) => left.length === right.length && left.every((item, index) => item === right[index]);
-  const conversationMessages = siteMessages.filter(message => {
-    const recipients = message.recipient_ids || [];
-    if (selectedMessengerUserIds.length === 0) {
-      return recipients.length === 0 && message.project_id === activeProjectId;
-    }
-    return isSameParticipantSet(getMessageParticipants(message), conversationParticipantIds);
-  });
-  const handleMessengerRecipientSelect = (userId, isGroupSelect = false) => {
-    if (!isGroupSelect) {
-      setSelectedMessengerUserIds([userId]);
-      return;
-    }
-
-    setSelectedMessengerUserIds(currentIds => (
-      currentIds.includes(userId)
-        ? currentIds.filter(id => id !== userId)
-        : [...currentIds, userId]
-    ));
-  };
-  const handleMessengerDragStart = (e) => {
-    if (e.target.closest('button')) return;
-    setIsDraggingMessenger(true);
-    setMessengerDragOffset({
-      x: e.clientX - messengerWindow.x,
-      y: e.clientY - messengerWindow.y
-    });
-  };
-  const handleMessengerResizeStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizingMessenger(true);
-    setMessengerResizeStart({
-      mouseX: e.clientX,
-      mouseY: e.clientY,
-      x: messengerWindow.x,
-      y: messengerWindow.y,
-      width: messengerChatSize.width,
-      height: messengerChatSize.height
-    });
-  };
 
   const appendProjectLog = async ({ projectId = activeProjectId, action, entityType, entityId, entityName, details = {} }) => {
     if (!projectId || !currentUser?.id) return;
@@ -1377,66 +1199,6 @@ function App() {
     const { data, error } = await supabase.from('project_logs').insert([payload]).select();
     if (!error && data?.[0]) {
       setProjectLogs([data[0], ...projectLogs]);
-    }
-  };
-
-  const handleSendSiteMessage = async (e) => {
-    e.preventDefault();
-    const body = messengerText.trim();
-    if (!body || !currentUser?.id || isSendingMessage) return;
-    if (!activeOrganizationId) {
-      alert('Сначала выберите организацию');
-      return;
-    }
-    if (selectedMessengerUserIds.length === 0 && !canUseProjectChat) {
-      alert('Общий чат доступен только участникам активного проекта');
-      return;
-    }
-
-    setIsSendingMessage(true);
-    const projectId = selectedMessengerUserIds.length === 0 ? activeProjectId : null;
-    const optimisticMessage = {
-      id: `local-${Date.now()}`,
-      author_id: currentUser.id,
-      recipient_ids: selectedMessengerUserIds,
-      project_id: projectId,
-      organization_id: activeOrganizationId,
-      body,
-      created_at: new Date().toISOString(),
-      isLocal: true
-    };
-    setSiteMessages([...siteMessages, optimisticMessage]);
-    setMessengerText('');
-
-    const { data, error } = await supabase
-      .from('site_messages')
-      .insert([{
-        author_id: currentUser.id,
-        recipient_ids: selectedMessengerUserIds,
-        project_id: projectId,
-        organization_id: activeOrganizationId,
-        body
-      }])
-      .select()
-      .single();
-
-    setIsSendingMessage(false);
-
-    if (error) {
-      setSiteMessages(siteMessages);
-      setMessengerText(body);
-      alert('Ошибка отправки сообщения: ' + error.message);
-      return;
-    }
-
-    setSiteMessages(currentMessages => currentMessages.map(message => message.id === optimisticMessage.id ? data : message));
-    const { data: notificationData, error: notificationError } = await supabase.functions.invoke('dispatch-message-notifications', {
-      body: { messageId: data.id }
-    });
-    if (notificationError) {
-      console.warn('Ошибка отправки внешних уведомлений:', notificationError.message);
-    } else if (notificationData?.results) {
-      console.info('Внешние уведомления:', notificationData.results);
     }
   };
 
@@ -2004,7 +1766,7 @@ function App() {
   };
 
   const handleCreateTask = async (stageId) => {
-    const newTask = { stage_id: stageId, name: 'Новая задача', status: 'planned', assignee_id: currentUser.id, checklist: [], attachments: [], feed: [], is_modified: false };
+    const newTask = { stage_id: stageId, name: 'Новая задача', status: 'planned', assignee_id: currentUser.id, checklist: [], attachments: [], feed: [], has_unread_changes: false };
     const { data, error } = await supabase.from('tasks').insert([newTask]).select();
     if (!error && data) {
       setTasks([...tasks, { ...data[0], subtask_count: 0, comment_count: 0, file_count: 0 }]);
@@ -2891,13 +2653,9 @@ function App() {
                               </td>
                               {CUSTOMIZABLE_ROLES.map(role => {
                                 const rolePerm = rolePermissions.find(p => p.organization_id === activeOrganizationId && p.role === role);
-                                let isChecked = false;
-                                if (rolePerm && rolePerm.permissions && rolePerm.permissions[perm.key] !== undefined) {
-                                  isChecked = rolePerm.permissions[perm.key];
-                                } else {
-                                  const isManagerOrAdmin = ['Администратор', 'Менеджер проектов'].includes(role);
-                                  isChecked = perm.key === 'manage_tasks' ? true : isManagerOrAdmin;
-                                }
+                                const isChecked = rolePerm?.permissions?.[perm.key] !== undefined
+                                  ? rolePerm.permissions[perm.key]
+                                  : (perm.key === 'manage_tasks' || ['Администратор', 'Менеджер проектов'].includes(role));
                                 return (
                                   <td key={role} style={{ textAlign: 'center', padding: '1rem' }}>
                                     <input 
@@ -3069,7 +2827,7 @@ function App() {
                                   onClick={(e) => { e.stopPropagation(); handleSelectTask(task); }}
                                   title={task.desc?.trim() || task.name}
                                 >
-                                  {task.is_modified && <div className="modified-indicator" title="В задаче были изменения"></div>}
+                                  {(task.has_unread_changes && currentUser?.id === task.assignee_id) && <div className="modified-indicator" title="В задаче есть непросмотренные изменения"></div>}
                                   {(canManageOrganization || isProjectLead) && (
                                     <button className="task-delete-btn" title="Удалить задачу" onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}>
                                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3085,7 +2843,7 @@ function App() {
                                     <span className="task-stage-marker" aria-hidden="true" />
                                     <span>{task.name}</span>
                                   </div>
-                                  {(task.file_count > 0 || task.subtask_count > 0 || task.comment_count > 0 || task.is_modified) && (
+                                  {(task.file_count > 0 || task.subtask_count > 0 || task.comment_count > 0 || (task.has_unread_changes && currentUser?.id === task.assignee_id)) && (
                                     <div className="task-indicators">
                                       {task.file_count > 0 && (
                                         <span className="task-indicator" title={`Файлы: ${task.file_count}`}>
@@ -3112,8 +2870,8 @@ function App() {
                                           {task.comment_count}
                                         </span>
                                       )}
-                                      {task.is_modified && (
-                                        <span className="task-indicator modified" title="В задаче были изменения">
+                                      {(task.has_unread_changes && currentUser?.id === task.assignee_id) && (
+                                        <span className="task-indicator modified" title="В задаче есть непросмотренные изменения">
                                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                             <path d="M12 2v4" />
                                             <path d="M12 18v4" />
@@ -3545,131 +3303,6 @@ function App() {
               />
            </m.div>
         )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {hoveredTooltip && (
-            <m.div
-              initial={{ opacity: 0, scale: 0.95, y: hoveredTooltip.rect.top < 150 ? 5 : -5 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: hoveredTooltip.rect.top < 150 ? 5 : -5 }}
-              transition={{ duration: 0.12 }}
-              style={{
-                position: 'fixed',
-                top: hoveredTooltip.rect.top < 150 ? hoveredTooltip.rect.bottom + 8 : hoveredTooltip.rect.top - 8,
-                left: hoveredTooltip.rect.left + hoveredTooltip.rect.width / 2,
-                transform: hoveredTooltip.rect.top < 150 ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
-                zIndex: 99999,
-                pointerEvents: 'none',
-                padding: '0.65rem 0.9rem',
-                borderRadius: '8px',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.4)',
-                border: '1px solid var(--panel-border)',
-                minWidth: '150px',
-                maxWidth: '280px',
-                fontSize: '0.78rem',
-                color: 'var(--text-primary)',
-                backgroundColor: 'rgba(20, 20, 20, 0.92)',
-                backdropFilter: 'blur(10px)',
-                lineHeight: '1.4'
-              }}
-            >
-              {hoveredTooltip.type === 'assignee' && (
-                <div>
-                  <div style={{ fontWeight: '600', color: 'var(--accent-color, #3b82f6)' }}>{hoveredTooltip.data.name}</div>
-                  {hoveredTooltip.data.role && <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>{hoveredTooltip.data.role}</div>}
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>{hoveredTooltip.data.email}</div>
-                </div>
-              )}
-              {hoveredTooltip.type === 'subtasks' && (
-                <div>
-                  <div style={{ fontWeight: '600', marginBottom: '0.35rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.15rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Подзадачи:</span>
-                    {!hoveredTooltip.isLoading && (
-                      <span style={{ color: 'var(--text-secondary)' }}>
-                        {hoveredTooltip.data.filter(t => t.is_completed).length}/{hoveredTooltip.data.length}
-                      </span>
-                    )}
-                  </div>
-                  {hoveredTooltip.isLoading ? (
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Загрузка...</div>
-                  ) : hoveredTooltip.data.length === 0 ? (
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Нет подзадач</div>
-                  ) : (
-                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      {hoveredTooltip.data.map((item, idx) => (
-                        <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', textDecoration: item.is_completed ? 'line-through' : 'none', color: item.is_completed ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
-                          <span style={{ color: item.is_completed ? '#10b981' : 'var(--text-secondary)', fontWeight: 'bold' }}>
-                            {item.is_completed ? '✓' : '○'}
-                          </span>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }}>{item.text || item.name}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-              {hoveredTooltip.type === 'comments' && (
-                <div>
-                  <div style={{ fontWeight: '600', marginBottom: '0.35rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.15rem' }}>Последние комментарии:</div>
-                  {hoveredTooltip.isLoading ? (
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Загрузка...</div>
-                  ) : hoveredTooltip.data.length === 0 ? (
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Нет комментариев</div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      {hoveredTooltip.data.slice(-3).reverse().map((item, idx) => {
-                        const author = item.author || users.find(u => u.id === item.author_id);
-                        return (
-                          <div key={idx} style={{ fontSize: '0.7rem', borderBottom: idx < Math.min(3, hoveredTooltip.data.length) - 1 ? '1px dashed rgba(255,255,255,0.05)' : 'none', paddingBottom: '0.25rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontWeight: '500', marginBottom: '0.05rem' }}>
-                              <span style={{ color: 'var(--accent-color, #3b82f6)' }}>{author?.name || author?.email || 'Система'}</span>
-                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.6rem' }}>{formatDate(item.created_at)}</span>
-                            </div>
-                            <div style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>{item.text}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-              {hoveredTooltip.type === 'attachments' && (
-                <div>
-                  <div style={{ fontWeight: '600', marginBottom: '0.35rem', borderBottom: '1px solid var(--panel-border)', paddingBottom: '0.15rem' }}>Вложения:</div>
-                  {hoveredTooltip.data.length === 0 ? (
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Вложений нет</div>
-                  ) : (
-                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      {hoveredTooltip.data.map((file, idx) => (
-                        <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem' }}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: 'var(--text-secondary)' }}>
-                            <path d="M21.44 11.05 12 20.49a6 6 0 0 1-8.49-8.49l9.44-9.44a4 4 0 0 1 5.66 5.66l-9.44 9.44a2 2 0 0 1-2.83-2.83l8.49-8.49" />
-                          </svg>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px', color: 'var(--text-primary)' }}>
-                            {file.file_name || file.name}
-                          </span>
-                          {file.file_size && <span style={{ color: 'var(--text-secondary)', fontSize: '0.6rem' }}>({formatFileSize(file.file_size)})</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-              {hoveredTooltip.type === 'date' && (
-                <div>
-                  <div style={{ fontWeight: '500', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Срок исполнения:</div>
-                  <div style={{ marginTop: '0.15rem', fontWeight: '600', color: 'var(--accent-color, #3b82f6)' }}>{formatDate(hoveredTooltip.data)}</div>
-                </div>
-              )}
-              {hoveredTooltip.type === 'status' && (
-                <div>
-                  <div style={{ fontWeight: '500', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Текущий статус:</div>
-                  <div style={{ marginTop: '0.15rem', fontWeight: '600' }} className={`status-badge-text ${hoveredTooltip.data}`}>{statusLabels[hoveredTooltip.data]}</div>
-                </div>
-              )}
-            </m.div>
-          )}
         </AnimatePresence>
       </div>
     </div>
