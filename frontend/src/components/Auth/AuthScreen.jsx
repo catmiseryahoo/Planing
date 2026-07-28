@@ -5,11 +5,14 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthError('');
+    setIsAuthLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setIsAuthLoading(false);
     if (error) setAuthError(error.message);
   };
 
@@ -24,8 +27,8 @@ export default function AuthScreen() {
         <form onSubmit={handleAuth} style={{display:'flex', flexDirection:'column'}}>
           <input className="auth-input" type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} required />
           <input className="auth-input" type="password" placeholder="Пароль" value={password} onChange={e=>setPassword(e.target.value)} required />
-          <button className="btn btn-primary" type="submit" style={{width:'100%', padding:'0.75rem', fontSize:'1rem'}}>
-            Войти
+          <button className="btn btn-primary" type="submit" disabled={isAuthLoading} style={{width:'100%', padding:'0.75rem', fontSize:'1rem'}}>
+            {isAuthLoading ? 'Вход...' : 'Войти'}
           </button>
         </form>
       </div>

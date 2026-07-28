@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:od-native-preview": "node scripts/build-od-native-preview.mjs",
+    "verify:od-native-preview": "node scripts/verify-od-native-preview.mjs",
+    "build:od-preview": "node scripts/build-od-preview.mjs",
+    "verify:od-preview": "node scripts/verify-od-preview.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

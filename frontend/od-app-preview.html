@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbite Planing — приложение</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-color: #f8f9fa;
+  --panel-bg: rgba(255, 255, 255, 0.82);
+  --card-bg: #f0f1f2;
+  --panel-border: rgba(0, 0, 0, 0.06);
+  --sidebar-bg: rgba(247, 248, 249, 0.85);
+  --text-primary: #191c1d;
+  --text-secondary: #4d4732;
+  --accent-color: #e9c400;
+  --accent-hover: #d4b000;
+  --accent-soft: rgba(233, 196, 0, 0.15);
+  --danger: #ba1a1a;
+  --font-body: 'IBM Plex Sans', sans-serif;
+  --font-display: 'Unbounded', 'IBM Plex Sans', sans-serif;
+  --status-planned: rgba(12, 103, 128, 0.1);
+  --status-planned-text: #0c6780;
+  --status-in-progress: rgba(233, 196, 0, 0.14);
+  --status-in-progress-text: #b89600;
+  --status-review: rgba(217, 119, 6, 0.14);
+  --status-review-text: #d97706;
+  --status-done: rgba(0, 110, 32, 0.13);
+  --status-done-text: #006e20;
+  --status-overdue: rgba(186, 26, 26, 0.14);
+  --status-overdue-text: #ba1a1a;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 16px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.04), 0 12px 28px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 1px 4px rgba(0, 0, 0, 0.04), 0 20px 60px rgba(0, 0, 0, 0.1);
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --sb-w: 280px;
+  --project-color: #0c6780;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { width: 100%; height: 100%; min-height: 100%; overflow: hidden; }
+html { position: fixed; inset: 0; }
+body {
+  font-family: var(--font-body); background-color: var(--bg-color);
+  background-image: linear-gradient(rgba(233, 196, 0, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(233, 196, 0, 0.04) 1px, transparent 1px), radial-gradient(circle at 14% 14%, rgba(233, 196, 0, 0.08), transparent 32%), radial-gradient(circle at 82% 6%, rgba(12, 103, 128, 0.08), transparent 30%);
+  background-size: 28px 28px, 28px 28px, auto, auto;
+  color: var(--text-primary); overflow: hidden; -webkit-font-smoothing: antialiased; color-scheme: light; touch-action: manipulation;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(120deg, transparent 0 42%, rgba(233, 196, 0, 0.06) 42% 43%, transparent 43% 100%), repeating-linear-gradient(90deg, rgba(233,196,0,0.03) 0 1px, transparent 1px 120px);
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent 86%);
+}
+::selection { background: rgba(233, 196, 0, 0.25); color: var(--text-primary); }
+
+/* App Layout */
+.app-container { display: flex; flex-direction: column; height: 100vh; height: 100svh; height: 100dvh; width: 100%; max-width: 100vw; padding: 1rem; gap: 1rem; overflow: hidden; }
+
+/* Top Bar */
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.75rem 1.5rem; flex-shrink: 0; min-width: 0; }
+.brand { flex: 0 1 auto; font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--text-primary); letter-spacing: 0.02em; white-space: nowrap; text-transform: uppercase; cursor: pointer; }
+.topbar-actions { flex: 1 1 auto; display: flex; align-items: center; justify-content: flex-end; gap: 1rem; min-width: 0; }
+
+.topbar-clock { position: relative; min-height: 46px; display: flex; align-items: center; flex: 0 1 auto; min-width: 0; }
+.topbar-clock-face { display: flex; align-items: center; gap: 0; min-height: 46px; padding: 0.15rem 0.45rem; border: 0; border-radius: var(--radius-md); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.topbar-clock-face:hover, .topbar-clock-face:focus-visible { background: rgba(0,0,0,0.04); outline: none; }
+.topbar-clock-main { min-width: 0; display: flex; align-items: center; gap: 0.45rem; line-height: 1; }
+.topbar-clock-time { font-family: var(--font-display); font-size: 1.1rem; color: var(--text-primary); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.topbar-clock-date { font-family: var(--font-display); font-size: 1.1rem; color: var(--text-secondary); font-weight: 700; white-space: nowrap; }
+.topbar-clock-separator { color: var(--text-secondary); font-size: 1.15rem; line-height: 1; opacity: 0.72; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 38px; padding: 0.45rem 1rem; border: 1px solid var(--panel-border); border-radius: var(--radius-md); background: rgba(0,0,0,0.04); color: var(--text-primary); font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; white-space: nowrap; text-decoration: none; transition: all 0.15s ease; }
+.btn:hover { background: rgba(0,0,0,0.06); border-color: rgba(148,163,184,0.42); }
+.btn:active { transform: scale(0.97); }
+.btn-primary { color: white; border-color: var(--accent-color); background: var(--accent-color); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: white; }
+.btn-outline { border-color: var(--accent-color); color: var(--accent-color); background: transparent; }
+.btn-outline:hover { background: var(--accent-soft); border-color: var(--accent-hover); }
+.btn-icon { min-width: 38px; padding: 0.45rem; font-size: 1rem; line-height: 1; }
+.btn-icon.active { background: var(--accent-soft); border-color: var(--accent-color); }
+
+/* User Profile */
+.user-profile { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: var(--radius-md); transition: background 0.2s; }
+.user-profile:hover { background: rgba(0,0,0,0.04); }
+.user-info { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
+.user-name { font-size: 0.875rem; font-weight: 600; max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-role { font-size: 0.7rem; color: var(--text-secondary); max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: white; font-size: 0.82rem; font-weight: 800; flex-shrink: 0; }
+.avatar.sm { width: 30px; height: 30px; font-size: 0.68rem; }
+
+.main-area { display: flex; flex: 1 1 auto; min-height: 0; gap: 1rem; }
+
+/* Glass Panel Base */
+.glass-panel {
+  background: linear-gradient(180deg, rgba(233,196,0,0.04), transparent 32%), var(--panel-bg);
+  backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sidebar Left */
+.sidebar-left { width: var(--sb-w); min-height: 0; flex-shrink: 0; }
+.sidebar-left .panel-header { min-height: 88px; }
+
+/* Headers */
+.panel-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; min-height: 56px; }
+.panel-header h2 { font-family: var(--font-display); font-size: 0.95rem; font-weight: 600; letter-spacing: 0.02em; }
+
+/* Content Areas */
+.panel-content { padding: 1.5rem; overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+
+/* Organization Switcher */
+.organization-switcher { margin-bottom: 0.75rem; }
+.detail-label { font-size: 0.65rem; color: var(--text-secondary); font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.3rem; }
+.organization-select { width: 100%; height: 38px; border: 1px solid var(--panel-border); border-radius: var(--radius-md); background: rgba(0,0,0,0.04); color: var(--text-primary); font: inherit; font-size: 0.84rem; padding: 0 0.6rem; outline: none; }
+.organization-select:focus { box-shadow: 0 0 0 2px rgba(216, 157, 66, 0.24); }
+.organization-switcher-meta { margin-top: 0.35rem; font-size: 0.7rem; color: var(--text-secondary); }
+
+/* Project List */
+.project-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.project-item { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.65rem; border-radius: var(--radius-md); cursor: pointer; border: 1px solid transparent; transition: all 0.15s ease; position: relative; }
+.project-item:hover { background: rgba(0,0,0,0.04); border-color: var(--panel-border); }
+.project-item.active { background: var(--accent-soft); border-color: var(--accent-color); border-left: 3px solid var(--project-color, #3b82f6); }
+.project-item-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.project-title-group { min-width: 0; flex: 1; }
+.project-name { background: none; border: none; color: var(--text-primary); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
+.project-name.editable { border-bottom: 1px dashed var(--panel-border); }
+.project-actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
+.project-meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); }
+
+/* Main Content */
+.main-content { flex: 1; min-width: 0; }
+.main-content > .project-main-header { min-height: 88px; }
+
+/* View Tabs */
+.view-tabs { display: flex; gap: 0.15rem; }
+.view-tab { padding: 0.45rem 0.85rem; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.view-tab:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
+.view-tab.active { background: var(--accent-soft); border-color: var(--accent-color); color: var(--text-primary); }
+
+/* Project Overview / Metrics */
+.project-overview { display: flex; gap: 0.5rem; padding: 0.55rem 1.25rem; border-bottom: 1px solid var(--panel-border); background: rgba(0,0,0,0.02); flex-shrink: 0; align-items: stretch; }
+.project-progress-main { flex: 7; min-width: 0; display: flex; flex-direction: column; justify-content: center; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 0.5rem 0.75rem; }
+.project-progress-topline { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.15rem; }
+.overview-label { font-size: 0.6rem; color: var(--text-secondary); font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.1rem; }
+.overview-stage-name { display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; }
+.overview-stage-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+.project-progress-bar { height: 5px; background: rgba(0,0,0,0.06); border-radius: 999px; overflow: hidden; margin-top: 0.15rem; }
+.project-progress-fill { height: 100%; border-radius: 999px; background: var(--accent-color); transition: width 0.4s ease; }
+.health-badge { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.65rem; font-weight: 800; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.15rem 0.5rem; border-radius: 999px; }
+.health-badge.at-risk { background: var(--status-overdue); color: var(--status-overdue-text); }
+.metric-cards { flex: 3; display: flex; gap: 0.35rem; min-width: 0; align-items: stretch; }
+.metric-card { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: var(--radius-md); padding: 0.35rem 0.3rem; text-align: center; }
+.metric-card .overview-label { font-size: 0.55rem; margin-bottom: 0; line-height: 1.2; }
+.metric-card .overview-value { font-size: 0.85rem; font-weight: 700; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.metric-card .overview-value.danger { color: var(--danger); }
+
+/* Map Container (Kanban) */
+.map-container { display: flex; gap: 1rem; padding: 1rem; overflow-x: auto; flex: 1; min-height: 0; align-items: flex-start; }
+
+/* Stage Column — stage-color set inline per stage, inherited by children */
+.stage-column { min-width: 250px; max-width: 300px; flex: 1; display: flex; flex-direction: column; background: rgba(16, 185, 129, 0.06); border-radius: var(--radius-lg); border: 1px solid var(--panel-border); --stage-color: #3b82f6; }
+.stage-header { padding: 0.75rem; cursor: grab; user-select: none; border-top: 4px solid var(--stage-color); }
+.stage-header .stage-progress-fill { background: var(--stage-color); }
+.task-card { --task-stage-color: var(--stage-color); }
+.stage-title { display: flex; align-items: center; gap: 0.5rem; }
+.stage-title input[type="color"] { width: 20px; height: 20px; padding: 0; border: none; background: transparent; cursor: pointer; }
+.stage-title input[type="text"] { background: transparent; border: none; color: inherit; font-weight: inherit; font-size: inherit; width: 100%; outline: none; }
+.stage-stats { display: flex; gap: 0.75rem; margin-top: 0.4rem; font-size: 0.7rem; color: var(--text-secondary); }
+.stage-progress-track { height: 4px; border-radius: 999px; background: rgba(0,0,0,0.08); margin-top: 0.4rem; overflow: hidden; }
+.stage-progress-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+
+/* Task List */
+.task-list { padding: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; flex: 1; overflow-y: auto; min-height: 0; }
+
+/* Task Card */
+.task-card { position: relative; padding: 0.85rem 0.65rem 0.65rem; border-radius: var(--radius-md); border: 1px solid var(--panel-border); background: var(--card-bg); cursor: pointer; transition: all 0.15s ease; }
+.task-card:hover { box-shadow: var(--shadow-md); border-color: var(--accent-color); }
+.task-card::before { content: ""; position: absolute; top: 4px; left: 0; bottom: 4px; width: 3px; background: var(--task-stage-color, #3b82f6); border-radius: 0 2px 2px 0; }
+.task-title { display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; font-weight: 600; line-height: 1.3; }
+.task-stage-marker { width: 8px; height: 8px; border-radius: 999px; background: var(--task-stage-color, #3b82f6); flex-shrink: 0; }
+.task-indicators { display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap; }
+.task-indicator { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.68rem; color: var(--text-secondary); }
+.task-indicator svg { flex-shrink: 0; }
+.task-indicator.modified { color: var(--accent-color); }
+.task-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 0.45rem; gap: 0.5rem; }
+.status-badge { display: inline-flex; align-items: center; padding: 0.12rem 0.45rem; border-radius: 999px; font-size: 0.65rem; font-weight: 700; white-space: nowrap; }
+.status-badge.planned { background: var(--status-planned); color: var(--status-planned-text); }
+.status-badge.in-progress { background: var(--status-in-progress); color: var(--status-in-progress-text); }
+.status-badge.review { background: var(--status-review); color: var(--status-review-text); }
+.status-badge.done { background: var(--status-done); color: var(--status-done-text); }
+.status-badge.overdue { background: var(--status-overdue); color: var(--status-overdue-text); }
+
+/* Add Stage Button */
+.add-stage-btn { display: flex; align-items: center; justify-content: center; min-width: 250px; max-width: 300px; min-height: 80px; border: 1px dashed var(--panel-border); border-radius: var(--radius-lg); color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.15s; background: transparent; }
+.add-stage-btn:hover { border-color: var(--accent-color); color: var(--accent-color); background: var(--accent-soft); }
+
+/* Empty State */
+.empty-state { padding: 1rem; color: var(--text-secondary); text-align: center; font-size: 0.82rem; }
+
+/* Modified indicator */
+.modified-indicator { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 999px; background: var(--accent-color); animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+/* Task delete btn */
+.task-delete-btn { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; display: none; align-items: center; justify-content: center; border-radius: var(--radius-sm); background: rgba(225,29,72,0.12); color: #e11d48; border: none; cursor: pointer; }
+.task-card:hover .task-delete-btn { display: flex; }
+.task-delete-btn:hover { background: rgba(225,29,72,0.2); }
+
+/* Add stage btn on column */
+.btn.dashed-add { margin-top: 0.5rem; background: transparent; border: 1px dashed var(--panel-border); color: var(--text-secondary); width: 100%; }
+.btn.dashed-add:hover { border-color: var(--accent-color); color: var(--accent-color); }
+</style>
+</head>
+<body>
+<div id="root">
+<div class="app-container">
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="brand" style="cursor:pointer">Orbite Planing</div>
+    <div class="topbar-actions">
+      <div class="topbar-clock">
+        <button type="button" class="topbar-clock-face">
+          <div class="topbar-clock-main">
+            <span class="topbar-clock-time" id="clockTime">10:34</span>
+            <span class="topbar-clock-separator">|</span>
+            <span class="topbar-clock-date" id="clockDate">26 июл</span>
+          </div>
+        </button>
+      </div>
+      <button class="btn btn-icon" title="AI Planning Skills" style="color:#10b981">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+        </svg>
+      </button>
+      <button class="btn btn-icon messenger-trigger" title="Мессенджер">
+        <svg class="messenger-trigger-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3.3 7.8A2.3 2.3 0 0 1 5.6 5.5h12.8a2.3 2.3 0 0 1 2.3 2.3v8.4a2.3 2.3 0 0 1-2.3 2.3H5.6a2.3 2.3 0 0 1-2.3-2.3V7.8Z"/>
+          <path d="m4.4 7 7.6 5.9L19.6 7"/>
+          <path d="m9.9 11.3-5.3 5"/>
+          <path d="m14.1 11.3 5.3 5"/>
+        </svg>
+      </button>
+      <div class="user-profile" style="cursor:pointer">
+        <div class="user-info">
+          <span class="user-name">Владимир</span>
+          <span class="user-role">Владелец</span>
+        </div>
+        <div class="avatar" style="background-color:#10b981">ВЛ</div>
+      </div>
+      <button class="btn btn-icon" title="Выйти">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Area -->
+  <div class="main-area">
+    <!-- Sidebar Left: Projects -->
+    <aside class="glass-panel sidebar-left">
+      <div class="panel-header">
+        <h2>Проекты</h2>
+        <button class="btn btn-icon" title="Создать проект">+</button>
+      </div>
+      <div class="panel-content" style="gap:0">
+        <div class="organization-switcher">
+          <div class="detail-label">Организация</div>
+          <select class="organization-select">
+            <option value="1">Orbite Studio</option>
+            <option value="2">Веб-студия «Графика»</option>
+          </select>
+          <div class="organization-switcher-meta">Владелец · 8 сотрудников</div>
+        </div>
+        <div class="project-list" id="projectList">
+          <div class="project-item active" style="--project-color:#10b981">
+            <div class="project-item-top">
+              <div class="project-title-group"><button type="button" class="project-name editable">Platform Core</button></div>
+              <div class="project-actions">
+                <button class="btn btn-icon project-edit-btn" style="font-size:0.8rem;min-width:28px;min-height:28px;padding:0.2rem">✎</button>
+                <button class="btn btn-icon project-delete-btn" style="font-size:0.8rem;min-width:28px;min-height:28px;padding:0.2rem">✕</button>
+              </div>
+            </div>
+            <div class="project-meta"><span>14 задач</span><span style="color:#e11d48">2 просрочено</span></div>
+          </div>
+          <div class="project-item" style="--project-color:#3b82f6">
+            <div class="project-item-top">
+              <div class="project-title-group"><span class="project-name">Маркетплейс v2</span></div>
+              <div class="project-actions">
+                <button class="btn btn-icon project-edit-btn" style="font-size:0.8rem;min-width:28px;min-height:28px;padding:0.2rem">✎</button>
+                <button class="btn btn-icon project-delete-btn" style="font-size:0.8rem;min-width:28px;min-height:28px;padding:0.2rem">✕</button>
+              </div>
+            </div>
+            <div class="project-meta"><span>27 задач</span></div>
+          </div>
+          <div class="project-item" style="--project-color:#10b981">
+            <div class="project-item-top">
+              <div class="project-title-group"><span class="project-name">Мобильное приложение</span></div>
+              <div class="project-actions">
+                <button class="btn btn-icon project-edit-btn" style="font-size:0.8rem;min-width:28px;min-height:28px;padding:0.2rem">✎</button>
+              </div>
+            </div>
+            <div class="project-meta"><span>9 задач</span></div>
+          </div>
+          <div class="project-item" style="--project-color:#8b5cf6">
+            <div class="project-item-top">
+              <div class="project-title-group"><span class="project-name">Сайт документации</span></div>
+            </div>
+            <div class="project-meta"><span>5 задач</span></div>
+          </div>
+          <div class="project-item" style="--project-color:#ef4444">
+            <div class="project-item-top">
+              <div class="project-title-group"><span class="project-name">Интеграция API</span></div>
+            </div>
+            <div class="project-meta"><span>12 задач</span><span style="color:#e11d48">4 просрочено</span></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content: Kanban Board -->
+    <main class="glass-panel main-content">
+      <!-- Header with Project Name & View Tabs -->
+      <div class="panel-header project-main-header" style="--project-color:#10b981">
+        <h2><button type="button" class="project-name editable" style="font-size:1.1rem;border:none;cursor:text;background:transparent;color:inherit;font:inherit;font-weight:700">Platform Core</button></h2>
+        <div class="view-tabs">
+          <button class="view-tab active">Канбан (Карта)</button>
+          <button class="view-tab">Диаграмма Ганта</button>
+          <button class="view-tab">Файлы</button>
+          <button class="view-tab">Визуализации</button>
+          <button class="view-tab">Сотрудники</button>
+          <button class="view-tab">Logs</button>
+        </div>
+      </div>
+
+      <!-- Project Overview / Metrics -->
+      <div class="project-overview">
+        <div class="project-progress-main">
+          <div class="project-progress-topline">
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+              <div>
+                <div class="overview-label">Текущий этап</div>
+                <div class="overview-stage-name">
+                  <span class="overview-stage-dot" style="background:var(--status-in-progress-text)"></span>
+                  Разработка
+                </div>
+              </div>
+            </div>
+            <div class="health-badge at-risk">Риск</div>
+          </div>
+          <div class="project-progress-bar">
+            <div class="project-progress-fill" style="width:57%"></div>
+          </div>
+        </div>
+        <div class="metric-cards">
+          <div class="metric-card">
+            <div class="overview-label">Выполнено</div>
+            <div class="overview-value">57%</div>
+          </div>
+          <div class="metric-card">
+            <div class="overview-label">План</div>
+            <div class="overview-value">62%</div>
+          </div>
+          <div class="metric-card">
+            <div class="overview-label">Отставание</div>
+            <div class="overview-value danger">5%</div>
+          </div>
+          <div class="metric-card">
+            <div class="overview-label">Задачи</div>
+            <div class="overview-value">8/14</div>
+          </div>
+          <div class="metric-card">
+            <div class="overview-label">Просрочено</div>
+            <div class="overview-value danger">2</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kanban Board -->
+      <div class="panel-content" style="padding:0;overflow:hidden">
+        <div class="map-container" id="kanbanBoard">
+          <!-- Stage 1: План -->
+          <div class="stage-column" style="--stage-color:#3b82f6">
+            <div class="stage-header">
+              <div class="stage-title">
+                <input type="color" value="#3b82f6" style="width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer">
+                <input type="text" value="План">
+                <button class="btn btn-icon danger" style="min-width:28px;min-height:28px;padding:0.2rem;color:#e11d48" title="Удалить этап">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+                </button>
+              </div>
+              <div class="stage-stats"><span>4 задач</span><span>100%</span></div>
+              <div class="stage-progress-track"><div class="stage-progress-fill" style="width:100%"></div></div>
+            </div>
+            <div class="task-list">
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Обсудить архитектуру</span></div>
+                <div class="task-meta">
+                  <span class="status-badge done">Готово</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>26 июн</span>
+                    <div class="avatar sm" style="background:#3b82f6">АИ</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Выбрать стек технологий</span></div>
+                <div class="task-indicators">
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>3</span>
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>2</span>
+                </div>
+                <div class="task-meta">
+                  <span class="status-badge done">Готово</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>28 июн</span>
+                    <div class="avatar sm" style="background:#10b981">ВЛ</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Настроить репозиторий и CI/CD</span></div>
+                <div class="task-indicators">
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05 12 20.49a6 6 0 0 1-8.49-8.49l9.44-9.44a4 4 0 0 1 5.66 5.66l-9.44 9.44a2 2 0 0 1-2.83-2.83l8.49-8.49"/></svg>1</span>
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>2</span>
+                </div>
+                <div class="task-meta">
+                  <span class="status-badge done">Готово</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>1 июл</span>
+                    <div class="avatar sm" style="background:#10b981">АС</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Создать дизайн-систему</span></div>
+                <div class="task-meta">
+                  <span class="status-badge done">Готово</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>3 июл</span>
+                    <div class="avatar sm" style="background:#ec4899">ЕК</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button class="btn dashed-add">+ Добавить задачу</button>
+          </div>
+
+          <!-- Stage 2: В работе -->
+          <div class="stage-column" style="--stage-color:#22c55e">
+            <div class="stage-header">
+              <div class="stage-title">
+                <input type="color" value="#22c55e" style="width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer">
+                <input type="text" value="В работе">
+                <button class="btn btn-icon danger" style="min-width:28px;min-height:28px;padding:0.2rem;color:#e11d48" title="Удалить этап">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+                </button>
+              </div>
+              <div class="stage-stats"><span>5 задач</span><span>60%</span></div>
+              <div class="stage-progress-track"><div class="stage-progress-fill" style="width:60%"></div></div>
+            </div>
+            <div class="task-list">
+              <div class="task-card">
+                <span class="modified-indicator"></span>
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>API авторизации</span></div>
+                <div class="task-indicators">
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05 12 20.49a6 6 0 0 1-8.49-8.49l9.44-9.44a4 4 0 0 1 5.66 5.66l-9.44 9.44a2 2 0 0 1-2.83-2.83l8.49-8.49"/></svg>5</span>
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>1</span>
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>3</span>
+                </div>
+                <div class="task-meta">
+                  <span class="status-badge in-progress">В работе</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>10 июл</span>
+                    <div class="avatar sm" style="background:#10b981">ВЛ</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>База данных: схемы и миграции</span></div>
+                <div class="task-indicators">
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>4</span>
+                </div>
+                <div class="task-meta">
+                  <span class="status-badge in-progress">В работе</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>12 июл</span>
+                    <div class="avatar sm" style="background:#10b981">АС</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>UI: карточки задач и drag-n-drop</span></div>
+                <div class="task-indicators">
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05 12 20.49a6 6 0 0 1-8.49-8.49l9.44-9.44a4 4 0 0 1 5.66 5.66l-9.44 9.44a2 2 0 0 1-2.83-2.83l8.49-8.49"/></svg>2</span>
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>1</span>
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>5</span>
+                </div>
+                <div class="task-meta">
+                  <span class="status-badge review">Проверка</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>14 июл</span>
+                    <div class="avatar sm" style="background:#ec4899">ЕК</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <span class="modified-indicator"></span>
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Оркестрация AI-агентов</span></div>
+                <div class="task-meta">
+                  <span class="status-badge in-progress">В работе</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>15 июл</span>
+                    <div class="avatar sm" style="background:#10b981">ВЛ</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Интеграция Supabase Edge Functions</span></div>
+                <div class="task-indicators">
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>7</span>
+                </div>
+                <div class="task-meta">
+                  <span class="status-badge overdue">Просрочено</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>20 июл</span>
+                    <div class="avatar sm" style="background:#10b981">АС</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button class="btn dashed-add">+ Добавить задачу</button>
+          </div>
+
+          <!-- Stage 3: Проверка -->
+          <div class="stage-column" style="--stage-color:#10b981">
+            <div class="stage-header">
+              <div class="stage-title">
+                <input type="color" value="#10b981" style="width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer">
+                <input type="text" value="Проверка">
+                <button class="btn btn-icon danger" style="min-width:28px;min-height:28px;padding:0.2rem;color:#e11d48" title="Удалить этап">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+                </button>
+              </div>
+              <div class="stage-stats"><span>3 задач</span><span>33%</span></div>
+              <div class="stage-progress-track"><div class="stage-progress-fill" style="width:33%"></div></div>
+            </div>
+            <div class="task-list">
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Code review: модуль авторизации</span></div>
+                <div class="task-indicators">
+                  <span class="task-indicator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>4</span>
+                </div>
+                <div class="task-meta">
+                  <span class="status-badge review">Проверка</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>18 июл</span>
+                    <div class="avatar sm" style="background:#8b5cf6">ДИ</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Тестирование API эндпоинтов</span></div>
+                <div class="task-meta">
+                  <span class="status-badge done">Готово</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>19 июл</span>
+                    <div class="avatar sm" style="background:#10b981">АС</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Аудит безопасности</span></div>
+                <div class="task-meta">
+                  <span class="status-badge review">Проверка</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>22 июл</span>
+                    <div class="avatar sm" style="background:#3b82f6">АИ</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button class="btn dashed-add">+ Добавить задачу</button>
+          </div>
+
+          <!-- Stage 4: Готово -->
+          <div class="stage-column" style="--stage-color:#2563eb">
+            <div class="stage-header">
+              <div class="stage-title">
+                <input type="color" value="#2563eb" style="width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer">
+                <input type="text" value="Готово">
+                <button class="btn btn-icon danger" style="min-width:28px;min-height:28px;padding:0.2rem;color:#e11d48" title="Удалить этап">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+                </button>
+              </div>
+              <div class="stage-stats"><span>2 задач</span><span>100%</span></div>
+              <div class="stage-progress-track"><div class="stage-progress-fill" style="width:100%"></div></div>
+            </div>
+            <div class="task-list">
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Инициализация проекта</span></div>
+                <div class="task-meta">
+                  <span class="status-badge done">Готово</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>24 июн</span>
+                    <div class="avatar sm" style="background:#10b981">ВЛ</div>
+                  </div>
+                </div>
+              </div>
+              <div class="task-card">
+                <button class="task-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
+                <div class="task-title"><span class="task-stage-marker"></span><span>Настройка окружения</span></div>
+                <div class="task-meta">
+                  <span class="status-badge done">Готово</span>
+                  <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span>25 июн</span>
+                    <div class="avatar sm" style="background:#3b82f6">АИ</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button class="btn dashed-add">+ Добавить задачу</button>
+          </div>
+
+          <!-- Add Stage -->
+          <div class="add-stage-btn">+ Добавить этап</div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</div>
+
+<script>
+// Update clock
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const day = now.getDate();
+  const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  document.getElementById('clockTime').textContent = h + ':' + m;
+  document.getElementById('clockDate').textContent = day + ' ' + months[now.getMonth()];
+}
+updateClock();
+setInterval(updateClock, 30000);
+</script>
+</body>
+</html>

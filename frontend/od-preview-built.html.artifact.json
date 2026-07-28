@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "frontend/od-preview-built.html",
+  "entry": "frontend/od-preview-built.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-07-26T12:58:21.692Z",
+  "updatedAt": "2026-07-26T12:58:21.692Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

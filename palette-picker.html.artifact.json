@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "Палитры — выбери настроение",
+  "entry": "palette-picker.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "primary": true,
+  "createdAt": "2026-07-27T13:19:12.653Z",
+  "updatedAt": "2026-07-27T13:19:12.659Z",
+  "sourceSkillId": "agent-browser",
+  "metadata": {
+    "identifier": "palette-picker",
+    "artifactType": "text/html",
+    "inferred": false
+  }
+}

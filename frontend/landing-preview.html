@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbite Planing — Визуализация дизайна</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #faf8f4;
+      --surface: rgba(255, 255, 255, 0.9);
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --border: rgba(0, 0, 0, 0.06);
+      --border-light: rgba(0, 0, 0, 0.08);
+      --fg: #1c1917;
+      --muted: #78716c;
+      --accent: #ea580c;
+      --accent-gradient: linear-gradient(90deg, #ea580c, #fb923c);
+      --logo-gradient: linear-gradient(90deg, #ea580c, #fdba74);
+      --glow-peach: rgba(251,146,60,0.15);
+      --glow-pink: rgba(244,114,182,0.07);
+      --font-body: 'Inter', -apple-system, sans-serif;
+      --font-display: 'Unbounded', 'Inter', -apple-system, sans-serif;
+      --radius-sm: 10px;
+      --radius-md: 18px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--fg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    .landing-container {
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .landing-bg {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+      background-image: radial-gradient(rgba(0,0,0,0.02) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    .glow-1 {
+      position: absolute;
+      width: 900px; height: 900px;
+      background: radial-gradient(circle, var(--glow-peach) 0%, transparent 70%);
+      top: -250px; right: -150px;
+      border-radius: 50%;
+      filter: blur(80px);
+    }
+
+    .glow-2 {
+      position: absolute;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, var(--glow-pink) 0%, transparent 70%);
+      bottom: -150px; left: -150px;
+      border-radius: 50%;
+      filter: blur(80px);
+    }
+
+    .landing-content {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ─── Navigation ─── */
+    .landing-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 2rem;
+    }
+
+    .landing-logo {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: var(--logo-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid rgba(0,0,0,0.12);
+      color: var(--fg);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 1.2rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: var(--font-body);
+    }
+
+    .btn-outline:hover {
+      background: rgba(0,0,0,0.03);
+      border-color: rgba(0,0,0,0.25);
+    }
+
+    /* ─── Hero ─── */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-top: 5rem;
+      margin-bottom: 6rem;
+      opacity: 0;
+      animation: fadeUp 0.7s ease forwards;
+    }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-title {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+      max-width: 800px;
+    }
+
+    .hero-accent { color: var(--accent); }
+
+    .hero-subtitle {
+      font-size: 1.25rem;
+      color: var(--muted);
+      max-width: 600px;
+      margin-bottom: 2.5rem;
+      line-height: 1.6;
+    }
+
+    .btn-primary {
+      background: var(--accent-gradient);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 1rem 2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      font-family: var(--font-body);
+      width: auto;
+    }
+
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:active { opacity: 0.85; }
+
+    /* ─── Stats ─── */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 3rem;
+      margin-bottom: 6rem;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      min-width: 200px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ─── Agents ─── */
+    .section-title {
+      text-align: center;
+      font-size: 2.25rem;
+      font-weight: 700;
+      margin-bottom: 3rem;
+      font-family: var(--font-display);
+    }
+
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin-bottom: 6rem;
+    }
+
+    .agent-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      backdrop-filter: blur(10px);
+      transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+
+    .agent-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 36px rgba(234,88,12,0.08);
+      border-color: rgba(234,88,12,0.2);
+    }
+
+    .agent-icon { font-size: 2.5rem; margin-bottom: 1.5rem; }
+
+    .agent-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--fg);
+    }
+
+    .agent-desc {
+      font-size: 0.95rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ─── Auth ─── */
+    .auth-section {
+      margin-bottom: 4rem;
+    }
+
+    .auth-wrapper {
+      max-width: 420px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 2.5rem;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 60px -12px rgba(0,0,0,0.08);
+    }
+
+    .auth-tabs {
+      display: flex;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .auth-tab {
+      flex: 1;
+      text-align: center;
+      padding: 0.75rem;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 500;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+    }
+
+    .auth-tab:hover { color: var(--fg); }
+
+    .auth-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .auth-input {
+      width: 100%;
+      background: rgba(0,0,0,0.03);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      color: var(--fg);
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      font-family: var(--font-body);
+    }
+
+    .auth-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(234,88,12,0.08);
+    }
+
+    .auth-input::placeholder { color: rgba(0,0,0,0.28); }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-full {
+      width: 100%;
+      background: var(--accent-gradient);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.85rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      font-family: var(--font-body);
+    }
+
+    .btn-full:hover { opacity: 0.9; }
+
+    .alert-error {
+      color: #ef4444;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .alert-success {
+      color: #10b981;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 768px) {
+      .hero-title { font-size: 2.5rem; }
+      .stats { gap: 1.5rem; }
+      .stat-card { min-width: 140px; padding: 1.5rem; }
+      .stat-value { font-size: 1.8rem; }
+      .input-row { flex-direction: column; gap: 0; }
+    }
+
+    @media (max-width: 480px) {
+      .landing-content { padding: 1.5rem 1rem; }
+      .hero-title { font-size: 2rem; }
+      .hero { margin-top: 3rem; }
+      .section-title { font-size: 1.75rem; }
+      .auth-wrapper { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="landing-container">
+    <!-- Background effects -->
+    <div class="landing-bg">
+      <div class="glow-1"></div>
+      <div class="glow-2"></div>
+    </div>
+
+    <div class="landing-content">
+      <!-- Navigation -->
+      <nav class="landing-nav">
+        <div class="landing-logo">Orbite Planing</div>
+        <button class="btn-outline" onclick="document.getElementById('auth').scrollIntoView({behavior:'smooth'})">Начать работу</button>
+      </nav>
+
+      <!-- Hero -->
+      <section class="hero" data-od-id="hero">
+        <h1 class="hero-title">
+          Планирование будущего с помощью <span class="hero-accent">ИИ Агентов</span>
+        </h1>
+        <p class="hero-subtitle">
+          Orbite Planing превращает хаос в систему. Используйте мощь искусственного интеллекта для автоматизации задач, проверки архитектуры и мозгового штурма.
+        </p>
+        <button class="btn-primary" onclick="document.getElementById('auth').scrollIntoView({behavior:'smooth'})">
+          Попробовать бесплатно
+        </button>
+      </section>
+
+      <!-- Stats -->
+      <section class="stats" data-od-id="stats">
+        <div class="stat-card">
+          <div class="stat-value">50%</div>
+          <div class="stat-label">Ускорение планирования</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">10k+</div>
+          <div class="stat-label">Оптимизированных задач</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">99%</div>
+          <div class="stat-label">Успешных релизов</div>
+        </div>
+      </section>
+
+      <!-- AI Agents -->
+      <section data-od-id="agents">
+        <h2 class="section-title">Ваши новые коллеги</h2>
+        <div class="agents-grid">
+          <div class="agent-card">
+            <div class="agent-icon">📄</div>
+            <h3 class="agent-title">PRD to Plan</h3>
+            <p class="agent-desc">Автоматически конвертирует бизнес-требования в четкие задачи, этапы и распределяет ресурсы.</p>
+          </div>
+          <div class="agent-card">
+            <div class="agent-icon">🧠</div>
+            <h3 class="agent-title">Roadmap Brainstorm</h3>
+            <p class="agent-desc">Анализирует проект и предлагает альтернативные пути развития и оптимизации сроков.</p>
+          </div>
+          <div class="agent-card">
+            <div class="agent-icon">🔥</div>
+            <h3 class="agent-title">Grill Me</h3>
+            <p class="agent-desc">Стресс-тестирует вашу архитектуру и находит узкие места в плане до начала разработки.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Auth -->
+      <section id="auth" class="auth-section" data-od-id="auth">
+        <div class="auth-wrapper">
+          <div class="auth-tabs">
+            <div class="auth-tab active" id="tab-login" onclick="switchAuth('login')">Вход</div>
+            <div class="auth-tab" id="tab-register" onclick="switchAuth('register')">Регистрация</div>
+          </div>
+
+          <div id="register-fields" style="display:none">
+            <div class="input-row">
+              <input class="auth-input" type="text" placeholder="Имя" required />
+              <input class="auth-input" type="text" placeholder="Фамилия" required />
+            </div>
+            <input class="auth-input" type="text" placeholder="Название организации" required />
+            <div class="input-row">
+              <input class="auth-input" type="tel" placeholder="Телефон" required />
+              <input class="auth-input" type="text" placeholder="Telegram / WhatsApp" required />
+            </div>
+          </div>
+
+          <input class="auth-input" type="email" placeholder="Email" required />
+          <input class="auth-input" type="password" placeholder="Пароль" required />
+          <button class="btn-full" id="auth-btn">Войти</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    function switchAuth(mode) {
+      document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+      document.getElementById('tab-register').classList.toggle('active', mode === 'register');
+      document.getElementById('register-fields').style.display = mode === 'register' ? 'block' : 'none';
+      document.getElementById('auth-btn').textContent = mode === 'login' ? 'Войти' : 'Создать аккаунт';
+    }
+
+    // Entrance animation with Intersection Observer
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.animation = 'fadeUp 0.6s ease forwards';
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.stat-card, .agent-card').forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      observer.observe(el);
+    });
+  </script>
+</body>
+</html>

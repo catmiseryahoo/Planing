@@ -29,6 +29,7 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [isDragOverFiles, setIsDragOverFiles] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const fileInputRef = useRef(null);
 
   const notifyAssignee = async (targetTaskId, targetAssigneeId) => {
@@ -41,12 +42,20 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
 
   const loadTaskData = useCallback(async (id) => {
     setIsLoading(true);
+    setLoadError(null);
     const [taskRes, subtasksRes, commentsRes, filesRes] = await Promise.all([
       supabase.from('tasks').select('*').eq('id', id).single(),
       supabase.from('subtasks').select('*').eq('task_id', id).order('created_at', { ascending: true }),
       supabase.from('comments').select('*, author:profiles(*)').eq('task_id', id).order('created_at', { ascending: true }),
       supabase.from('task_files').select('*').eq('task_id', id).order('created_at', { ascending: true })
     ]);
+
+    const hasAllErrors = [taskRes, subtasksRes, commentsRes, filesRes].every(r => r.error);
+    if (hasAllErrors) {
+      setLoadError('Не удалось загрузить данные задачи. Проверьте подключение и права доступа.');
+      setIsLoading(false);
+      return;
+    }
 
     if (taskRes.data) {
       setTask(taskRes.data);
@@ -306,6 +315,17 @@ export default function TaskSidebar({ taskId, onClose, currentUser, users, stage
   const isImageFile = (file) => {
     return /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(file.file_name || file.file_url || '');
   };
+
+  if (loadError) {
+    return (
+      <aside className="glass-panel sidebar-right" style={{ display: 'flex', padding: '2rem', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+        <p style={{ color: 'var(--danger)', textAlign: 'center' }}>{loadError}</p>
+        <button className="btn" onClick={() => taskId && loadTaskData(taskId)} style={{ padding: '0.5rem 1.5rem' }}>
+          Повторить загрузку
+        </button>
+      </aside>
+    );
+  }
 
   if (isLoading) {
     return (

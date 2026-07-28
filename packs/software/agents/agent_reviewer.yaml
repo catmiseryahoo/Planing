@@ -1,0 +1,12 @@
+accent: '#5b8def'
+agent_id: agent_reviewer
+capabilities: []
+description: Reviewer agent for the software workflow.
+enabled: false
+name: Reviewer
+pack_id: pack_software
+role: reviewer
+runtime_adapter_id: adapter_disabled
+skill_ids:
+- skill_reviewer
+version: 1.0.0

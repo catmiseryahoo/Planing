@@ -16,8 +16,7 @@ serve(async (req) => {
 
     // 1. Получаем ключи (упадут, если не настроены)
     const llmApiKey = Deno.env.get('LLM_API_KEY');
-    // Берем токен из окружения, либо используем хардкод (только для примера, лучше хранить в .env)
-    const polzaMcpToken = Deno.env.get('POLZA_MCP_TOKEN') || 'polza_5fbaceb1a957097dd0a9a711b66343176c48343c0c08776463232c8b609f7df2';
+    const polzaMcpToken = Deno.env.get('POLZA_MCP_TOKEN');
 
     if (!llmApiKey) {
       return new Response(JSON.stringify({ 

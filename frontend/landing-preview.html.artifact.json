@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "frontend/landing-preview.html",
+  "entry": "frontend/landing-preview.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-07-26T10:56:57.508Z",
+  "updatedAt": "2026-07-26T10:56:57.508Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

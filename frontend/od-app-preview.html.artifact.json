@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "frontend/od-app-preview.html",
+  "entry": "frontend/od-app-preview.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-07-26T12:55:29.061Z",
+  "updatedAt": "2026-07-26T12:55:29.061Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

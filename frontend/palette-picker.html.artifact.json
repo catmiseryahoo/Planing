@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "frontend/palette-picker.html",
+  "entry": "frontend/palette-picker.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-07-27T13:21:55.984Z",
+  "updatedAt": "2026-07-27T13:21:55.984Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

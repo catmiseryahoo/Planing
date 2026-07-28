@@ -1,21 +1,3 @@
-# microsoft/TRELLIS.2
-
-Source: https://huggingface.co/spaces/microsoft/TRELLIS.2/agents.md
-
-To use this application (microsoft/TRELLIS.2: Generate a 3D model from an uploaded image):
-
-API schema: GET https://microsoft-trellis-2.hf.space/gradio_api/info
-
-Config (find fn_index): GET https://microsoft-trellis-2.hf.space/config -> dependencies[i].id where api_name matches API schema endpoint
-
-Join the queue: POST https://microsoft-trellis-2.hf.space/gradio_api/queue/join (pass {"data": [...], "fn_index": <from-config>, "session_hash": "<random-uuid>"})
-
-Stream results: GET https://microsoft-trellis-2.hf.space/gradio_api/queue/data?session_hash=<same-uuid>
-
-File inputs: POST https://microsoft-trellis-2.hf.space/gradio_api/upload -F "files=@file.ext", use as: {"path": "<returned-path>", "meta": {"_type": "gradio.FileData"}, "orig_name": "file.ext"}
-
-Auth: Bearer $HF_TOKEN (https://huggingface.co/settings/tokens)
-
 # Frontend Design Guidance
 
 Source: https://github.com/anthropics/claude-code/tree/main/plugins/frontend-design
@@ -28,5 +10,28 @@ When changing the frontend, use the referenced plugin as a design brief rather t
 - Keep the first screen as the actual planning workspace. Do not turn this app into a marketing landing page.
 - Preserve workflow density: project list, status metrics, map/Gantt surfaces, task panels, messenger, and profile tools should stay scannable and efficient.
 - Verify frontend changes with a local build and, when a dev server is running, a browser check.
+
+## Open Design preview contract
+
+- This is an existing Vite/React application, not a single-file web prototype.
+- Prefer OD's native Vite powered-preview path. From the Beelink checkout
+  `/home/catmiser/projects/Planing/frontend`, run:
+  `~/.hermes/node/bin/node scripts/build-od-native-preview.mjs` and then
+  `~/.hermes/node/bin/node scripts/verify-od-native-preview.mjs`.
+- The native preview entry selected in OD is `frontend/index.html`. OD detects
+  its standard `/src/...` module entry, serves sibling `frontend/dist/index.html`
+  and rewrites built `/assets/*` URLs to `dist/assets/*`. Do not start a dev
+  server, open `index.html` with `file://`, or replace the app with a mockup.
+- The native preview build compiles `VITE_OD_PREVIEW=true`, so the real React
+  UI uses `src/odPreviewData.js` and does not require live Supabase credentials.
+- After every source change, refresh `frontend/index.html` in OD and inspect the
+  rendered application. Build output or a Hermes text response is not visual
+  verification. Never claim success for source text, a blank frame, stale assets,
+  or an old screenshot.
+- Keep `frontend/od-preview-built.html` and its builder as a fallback only when
+  the native powered path cannot serve a particular app. Do not edit
+  `frontend/index.html` merely to bypass a Vite build failure.
+- The detailed Hermes runbook is `docs/OD-HERMES-WORKFLOW.md`; read it before
+  starting or reporting any OD visual task.
 
 - Always format URLs (like http://localhost:5173/) as clickable markdown links (e.g. [http://localhost:5173/](http://localhost:5173/)) so the user doesn't have to copy and paste them.

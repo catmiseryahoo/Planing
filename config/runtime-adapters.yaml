@@ -1,0 +1,9 @@
+adapters:
+- adapter_id: adapter_disabled
+  capabilities: []
+  isolation_mode: none
+  name: Catalog only
+  reason: Runtime execution is unavailable until explicitly enabled.
+  state: disabled
+  version: 1.0.0
+version: 1.0.0

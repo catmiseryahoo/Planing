@@ -1,0 +1,97 @@
+{
+  "schema_name": "SourceMapV1",
+  "schema_version": "1.4.0",
+  "id_scheme_version": "1",
+  "extensions": {},
+  "source_map_id": "srcmap_abb426853a46bb296af44b760691001f85800847cf423410ebed9b1a58daea81",
+  "installation_id": "install_6f07d5cdfc99a09ab2915de4b4613b454f718a99f3f80616c635dc32c225e709",
+  "roots": [
+    {
+      "schema_name": "SourceRootV1",
+      "schema_version": "1.4.0",
+      "id_scheme_version": "1",
+      "extensions": {},
+      "source_root_id": "srcroot_1d5c73eb5756ee91f1c4f5b6ce77625543d6e51b64d1b7fc9f219fbd71c3ec4c",
+      "relative_path": "docs",
+      "source_type": "markdown",
+      "adapter": "adapter:markdown",
+      "sensitivity": "internal",
+      "trust_class": "user",
+      "policy": "index_only",
+      "provenance": [
+        "detected:bootstrap"
+      ],
+      "confidence": "high"
+    },
+    {
+      "schema_name": "SourceRootV1",
+      "schema_version": "1.4.0",
+      "id_scheme_version": "1",
+      "extensions": {},
+      "source_root_id": "srcroot_8e1eb13fb48ee26783cebc85c5850523fbe93bab01efe5dbf5b556bfa2ab1219",
+      "relative_path": "frontend",
+      "source_type": "software",
+      "adapter": "adapter:software",
+      "sensitivity": "internal",
+      "trust_class": "user",
+      "policy": "index_and_graph",
+      "provenance": [
+        "detected:bootstrap"
+      ],
+      "confidence": "high"
+    },
+    {
+      "schema_name": "SourceRootV1",
+      "schema_version": "1.4.0",
+      "id_scheme_version": "1",
+      "extensions": {},
+      "source_root_id": "srcroot_4109bba89caf78b0f694ab14ea6716ff9c617439f6b65f7165c1ed4da9f9236a",
+      "relative_path": "graphify-out",
+      "source_type": "markdown",
+      "adapter": "adapter:markdown",
+      "sensitivity": "internal",
+      "trust_class": "user",
+      "policy": "index_only",
+      "provenance": [
+        "detected:bootstrap"
+      ],
+      "confidence": "high"
+    },
+    {
+      "schema_name": "SourceRootV1",
+      "schema_version": "1.4.0",
+      "id_scheme_version": "1",
+      "extensions": {},
+      "source_root_id": "srcroot_cbb5ee55bfbe70e41704105a316a6b07b934c7b7712adc9d97b50a42e89c8aae",
+      "relative_path": "hostland",
+      "source_type": "software",
+      "adapter": "adapter:software",
+      "sensitivity": "internal",
+      "trust_class": "user",
+      "policy": "index_and_graph",
+      "provenance": [
+        "detected:bootstrap"
+      ],
+      "confidence": "high"
+    },
+    {
+      "schema_name": "SourceRootV1",
+      "schema_version": "1.4.0",
+      "id_scheme_version": "1",
+      "extensions": {},
+      "source_root_id": "srcroot_b48438e508cf71ad6f6035c517effedf31062e406ba4001719eeced9fdee76bd",
+      "relative_path": "supabase",
+      "source_type": "software",
+      "adapter": "adapter:software",
+      "sensitivity": "internal",
+      "trust_class": "user",
+      "policy": "index_and_graph",
+      "provenance": [
+        "detected:bootstrap"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "map_sha256": "dc192232fc477958b86955ab031fffd2889facde6b9de5e6ecec3aca90c7ccf6",
+  "created_at": "2026-07-21T06:12:27.391546Z"
+}

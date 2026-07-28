@@ -1,0 +1,12 @@
+accent: '#5b8def'
+agent_id: agent_tester
+capabilities: []
+description: Tester agent for the software workflow.
+enabled: false
+name: Tester
+pack_id: pack_software
+role: tester
+runtime_adapter_id: adapter_disabled
+skill_ids:
+- skill_tester
+version: 1.0.0

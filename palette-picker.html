@@ -1,0 +1,205 @@
+
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Палитры для Planing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,system-ui,sans-serif;background:#faf9f6;color:#1c1917;padding:2rem}
+h1{font-size:1.75rem;font-weight:700;margin-bottom:0.5rem;letter-spacing:-0.02em}
+.sub{color:#78716c;margin-bottom:2rem;font-size:0.95rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1.25rem}
+.card{border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);transition:transform .2s,box-shadow .2s;cursor:pointer;background:#fff}
+.card:hover{transform:translateY(-4px);box-shadow:0 4px 12px rgba(0,0,0,.08),0 12px 32px rgba(0,0,0,.06)}
+.preview{height:100px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.preview-glow{position:absolute;width:200px;height:200px;border-radius:50%;opacity:0.2;top:-40px;filter:blur(40px)}
+.preview-label{position:relative;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;opacity:0.6}
+.body{padding:1rem 1.1rem 1.1rem}
+.card h3{font-size:1rem;font-weight:600;margin-bottom:0.6rem;letter-spacing:-0.01em}
+.swatch-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0.7rem}
+.swatch{width:32px;height:32px;border-radius:8px;border:1px solid rgba(0,0,0,.06);flex-shrink:0}
+.swatch-label{font-size:0.7rem;color:#78716c;font-weight:500;margin-top:0.25rem;white-space:nowrap}
+.vars{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:0.72rem;font-weight:500}
+.vars span{color:#57534e}
+.vars code{color:#292524;font-size:0.7rem;font-family:'SF Mono',ui-monospace,monospace}
+.pill{display:inline-block;padding:1px 8px;border-radius:4px;font-size:0.65rem;font-weight:600;margin-right:3px}
+.current{background:#fef3c7;color:#92400e;font-size:0.7rem;padding:2px 10px;border-radius:6px;display:inline-block;margin-top:0.5rem}
+</style>
+</head>
+<body>
+<h1>Оптимистичные палитры для Planing</h1>
+<div class="sub">Текущий вариант: светлая, сдержанная. Ниже — сочные, энергичные, жизнерадостные.</div>
+
+<div class="grid">
+
+  <!-- 1. CORAL SUNRISE — яркий коралл -->
+  <div class="card" onclick="pick(1)">
+    <div class="preview" style="background:linear-gradient(135deg,#fff5f0,#fef2f2)">
+      <div class="preview-glow" style="background:#f97316;left:10%"></div>
+      <div class="preview-glow" style="background:#e11d48;right:10%"></div>
+      <span class="preview-label" style="color:#e11d48">☀️ coral sunrise</span>
+    </div>
+    <div class="body">
+      <h3>🌅 Коралловый рассвет</h3>
+      <div class="swatch-grid">
+        <div><div class="swatch" style="background:#fef7f2"></div><div class="swatch-label">фон</div></div>
+        <div><div class="swatch" style="background:#fff"></div><div class="swatch-label">карта</div></div>
+        <div><div class="swatch" style="background:#292524"></div><div class="swatch-label">текст</div></div>
+        <div><div class="swatch" style="background:#f97316"></div><div class="swatch-label">акцент</div></div>
+      </div>
+      <div class="vars">
+        <span>bg:</span><code>#fef7f2</code>
+        <span>surface:</span><code>#fff</code>
+        <span>text:</span><code>#292524</code>
+        <span>accent:</span><code>#f97316</code>
+        <span>hover:</span><code>#ea580c</code>
+        <span>success:</span><code>#16a34a</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. SUNNY YELLOW — солнечный жёлтый -->
+  <div class="card" onclick="pick(2)">
+    <div class="preview" style="background:linear-gradient(135deg,#fffbeb,#fef9c3)">
+      <div class="preview-glow" style="background:#f59e0b;left:10%"></div>
+      <div class="preview-glow" style="background:#eab308;right:10%"></div>
+      <span class="preview-label" style="color:#b45309">🌻 sunny yellow</span>
+    </div>
+    <div class="body">
+      <h3>🌻 Солнечный день</h3>
+      <div class="swatch-grid">
+        <div><div class="swatch" style="background:#fefce8"></div><div class="swatch-label">фон</div></div>
+        <div><div class="swatch" style="background:#fff"></div><div class="swatch-label">карта</div></div>
+        <div><div class="swatch" style="background:#1c1917"></div><div class="swatch-label">текст</div></div>
+        <div><div class="swatch" style="background:#eab308"></div><div class="swatch-label">акцент</div></div>
+      </div>
+      <div class="vars">
+        <span>bg:</span><code>#fefce8</code>
+        <span>surface:</span><code>#fff</code>
+        <span>text:</span><code>#1c1917</code>
+        <span>accent:</span><code>#eab308</code>
+        <span>hover:</span><code>#ca8a04</code>
+        <span>success:</span><code>#059669</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. FRESH EMERALD — сочный изумруд -->
+  <div class="card" onclick="pick(3)">
+    <div class="preview" style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5)">
+      <div class="preview-glow" style="background:#10b981;left:10%"></div>
+      <div class="preview-glow" style="background:#34d399;right:10%"></div>
+      <span class="preview-label" style="color:#059669">🌿 fresh emerald</span>
+    </div>
+    <div class="body">
+      <h3>🌿 Сочная зелень</h3>
+      <div class="swatch-grid">
+        <div><div class="swatch" style="background:#f0fdf4"></div><div class="swatch-label">фон</div></div>
+        <div><div class="swatch" style="background:#fff"></div><div class="swatch-label">карта</div></div>
+        <div><div class="swatch" style="background:#1a2e22"></div><div class="swatch-label">текст</div></div>
+        <div><div class="swatch" style="background:#10b981"></div><div class="swatch-label">акцент</div></div>
+      </div>
+      <div class="vars">
+        <span>bg:</span><code>#f0fdf4</code>
+        <span>surface:</span><code>#fff</code>
+        <span>text:</span><code>#1a2e22</code>
+        <span>accent:</span><code>#10b981</code>
+        <span>hover:</span><code>#059669</code>
+        <span>success:</span><code>#2563eb</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. VIBRANT SKY — ясное небо -->
+  <div class="card" onclick="pick(4)">
+    <div class="preview" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe)">
+      <div class="preview-glow" style="background:#0ea5e9;left:10%"></div>
+      <div class="preview-glow" style="background:#38bdf8;right:10%"></div>
+      <span class="preview-label" style="color:#0369a1">☁️ vibrant sky</span>
+    </div>
+    <div class="body">
+      <h3>☀️ Ясное небо</h3>
+      <div class="swatch-grid">
+        <div><div class="swatch" style="background:#f0f9ff"></div><div class="swatch-label">фон</div></div>
+        <div><div class="swatch" style="background:#fff"></div><div class="swatch-label">карта</div></div>
+        <div><div class="swatch" style="background:#0c1929"></div><div class="swatch-label">текст</div></div>
+        <div><div class="swatch" style="background:#0ea5e9"></div><div class="swatch-label">акцент</div></div>
+      </div>
+      <div class="vars">
+        <span>bg:</span><code>#f0f9ff</code>
+        <span>surface:</span><code>#fff</code>
+        <span>text:</span><code>#0c1929</code>
+        <span>accent:</span><code>#0ea5e9</code>
+        <span>hover:</span><code>#0284c7</code>
+        <span>success:</span><code>#10b981</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. PEACH FUZZIA — персик + фуксия -->
+  <div class="card" onclick="pick(5)">
+    <div class="preview" style="background:linear-gradient(135deg,#fef7ee,#fdf2f8)">
+      <div class="preview-glow" style="background:#f472b6;left:10%"></div>
+      <div class="preview-glow" style="background:#fb923c;right:10%"></div>
+      <span class="preview-label" style="color:#db2777">🌸 peach fuchsia</span>
+    </div>
+    <div class="body">
+      <h3>🌸 Персик и фуксия</h3>
+      <div class="swatch-grid">
+        <div><div class="swatch" style="background:#fef7ee"></div><div class="swatch-label">фон</div></div>
+        <div><div class="swatch" style="background:#fff"></div><div class="swatch-label">карта</div></div>
+        <div><div class="swatch" style="background:#24181d"></div><div class="swatch-label">текст</div></div>
+        <div><div class="swatch" style="background:#ec4899"></div><div class="swatch-label">акцент</div></div>
+      </div>
+      <div class="vars">
+        <span>bg:</span><code>#fef7ee</code>
+        <span>surface:</span><code>#fff</code>
+        <span>text:</span><code>#24181d</code>
+        <span>accent:</span><code>#ec4899</code>
+        <span>hover:</span><code>#db2777</code>
+        <span>success:</span><code>#059669</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. BOLD RETRO — смелый ретро -->
+  <div class="card" onclick="pick(6)">
+    <div class="preview" style="background:linear-gradient(135deg,#fef9ef,#fdece4)">
+      <div class="preview-glow" style="background:#f97316;left:10%"></div>
+      <div class="preview-glow" style="background:#2563eb;right:10%"></div>
+      <span class="preview-label" style="color:#2563eb">🎯 bold retro</span>
+    </div>
+    <div class="body">
+      <h3>🎯 Смелый ретро</h3>
+      <div class="swatch-grid">
+        <div><div class="swatch" style="background:#fef9ef"></div><div class="swatch-label">фон</div></div>
+        <div><div class="swatch" style="background:#fff7ed"></div><div class="swatch-label">карта</div></div>
+        <div><div class="swatch" style="background:#1c1917"></div><div class="swatch-label">текст</div></div>
+        <div><div class="swatch" style="background:#f97316"></div><div class="swatch-label">акцент</div></div>
+      </div>
+      <div class="vars">
+        <span>bg:</span><code>#fef9ef</code>
+        <span>surface:</span><code>#fff7ed</code>
+        <span>text:</span><code>#1c1917</code>
+        <span>accent:</span><code>#f97316</code>
+        <span>hover:</span><code>#ea580c</code>
+        <span>sec:</span><code>#2563eb</code>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p style="margin-top:1.5rem;font-size:0.85rem;color:#78716c;border-top:1px solid #e7e5e4;padding-top:1rem">
+  Выбери номер и скажи «давай вариант N» — я применю выбранную палитру к приложению.
+</p>
+
+<script>
+function pick(n){console.log('picked',n)}
+</script>
+</body>
+</html>

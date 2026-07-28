@@ -1,0 +1,6 @@
+version: "1.0.0"
+promotion:
+  fixture: autonomous
+  real: manual_hash_bound
+external_actions:
+  default: draft_outbox

@@ -9,7 +9,11 @@ import MessengerPanel from './components/Messenger/MessengerPanel';
 import ErrorBoundary from './components/Messenger/ErrorBoundary';
 import SkillsPanel from './components/AI/SkillsPanel';
 import { formatPhone, isCompletePhone } from './utils/phone';
+import { OD_PREVIEW_DATA, OD_PREVIEW_SESSION } from './odPreviewData';
 import './index.css';
+
+const IS_OD_PREVIEW = (typeof window !== 'undefined' && window.__OD_PREVIEW__ === true)
+  || import.meta.env.VITE_OD_PREVIEW === 'true';
 
 const statusLabels = {
   'planned': 'План',
@@ -529,8 +533,8 @@ const ProjectMemberIcon = ({ type }) => {
 
 function App() {
   const shouldReduceMotion = useReducedMotion();
-  const [session, setSession] = useState(null);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [session, setSession] = useState(IS_OD_PREVIEW ? OD_PREVIEW_SESSION : null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(!IS_OD_PREVIEW);
 
   const [projects, setProjects] = useState([]);
   const [organizations, setOrganizations] = useState([]);
@@ -552,6 +556,7 @@ function App() {
   const [isSkillsPanelOpen, setIsSkillsPanelOpen] = useState(false);
   const [isMobileOverviewExpanded, setIsMobileOverviewExpanded] = useState(false);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [activeOrganizationId, setActiveOrganizationId] = useState(null);
@@ -612,6 +617,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (IS_OD_PREVIEW) {
+      return undefined;
+    }
+
     let isMounted = true;
 
     const loadSession = async () => {
@@ -738,6 +747,28 @@ function App() {
 
   const fetchData = useCallback(async (preferredOrganizationId = activeOrganizationId) => {
     if (!session) return;
+
+    if (IS_OD_PREVIEW) {
+      const preview = OD_PREVIEW_DATA;
+      setProjects(preview.projects);
+      setOrganizations(preview.organizations);
+      setOrganizationMembers(preview.organizationMembers);
+      setStages(preview.stages);
+      setTasks(preview.tasks);
+      setUsers(preview.users);
+      setTaskFiles(preview.taskFiles);
+      setProjectMembers(preview.projectMembers);
+      setProjectLogs(preview.projectLogs);
+      setSiteMessages(preview.siteMessages);
+      setVisualizations(preview.visualizations);
+      setRolePermissions(preview.rolePermissions);
+      setCurrentUser(preview.currentUser);
+      setActiveOrganizationId(preview.organizations[0]?.id || null);
+      setActiveProjectId(preview.projects[0]?.id || null);
+      setIsDataLoading(false);
+      return;
+    }
+
     setIsDataLoading(true);
     setProfileSyncError('');
     setDataLoadError('');
@@ -2007,6 +2038,18 @@ function App() {
     <LazyMotion features={domAnimation}>
     <div className="app-container">
       <header className="topbar">
+        <button
+          className="mobile-menu-toggle btn btn-icon"
+          onClick={() => setIsMobileSidebarOpen(prev => !prev)}
+          aria-label="Открыть список проектов"
+          title="Проекты"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M3 6h18" />
+            <path d="M3 12h18" />
+            <path d="M3 18h18" />
+          </svg>
+        </button>
         <div className="brand" onClick={() => setActiveView('map')} style={{cursor:'pointer'}}>Orbite Planing</div>
         
         <div className="topbar-actions">
@@ -2189,9 +2232,9 @@ function App() {
         )}
       </AnimatePresence>
 
-      <div className="main-area">
+      <div className="main-area" onClick={() => isMobileSidebarOpen && setIsMobileSidebarOpen(false)}>
         {activeView === 'map' && (
-          <aside className="glass-panel sidebar-left">
+          <aside className={`glass-panel sidebar-left${isMobileSidebarOpen ? ' mobile-open' : ''}`}>
             <div className="panel-header">
               <h2>Проекты</h2>
               <button className="btn btn-icon" title="Создать проект" onClick={handleAddProject}>+</button>
@@ -2760,10 +2803,21 @@ function App() {
                     <div className="project-progress-bar">
                       <div className="project-progress-fill" style={{width: `${projectMetrics.actualProgress}%`}}></div>
                     </div>
-                    <div className="project-progress-footer">
-                      <span>{projectMetrics.actualProgress}% выполнено</span>
-                      <span>План на сегодня: {projectMetrics.plannedProgress}%</span>
+                  </div>
+                  <div className="overview-metric progress">
+                    <div className="overview-label">Прогресс</div>
+                    <div className="overview-mini-bar">
+                      <div className="overview-mini-bar-fill" style={{width: `${projectMetrics.actualProgress}%`}}></div>
                     </div>
+                    <div className="overview-value">{projectMetrics.actualProgress}%</div>
+                  </div>
+                  <div className="overview-metric">
+                    <div className="overview-label">Выполнено</div>
+                    <div className="overview-value">{projectMetrics.actualProgress}%</div>
+                  </div>
+                  <div className="overview-metric">
+                    <div className="overview-label">План</div>
+                    <div className="overview-value">{projectMetrics.plannedProgress}%</div>
                   </div>
                   <div className="overview-metric">
                     <div className="overview-label">Задачи</div>
