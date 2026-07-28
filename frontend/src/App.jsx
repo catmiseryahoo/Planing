@@ -12,8 +12,7 @@ import { formatPhone, isCompletePhone } from './utils/phone';
 import { OD_PREVIEW_DATA, OD_PREVIEW_SESSION } from './odPreviewData';
 import './index.css';
 
-const IS_OD_PREVIEW = (typeof window !== 'undefined' && window.__OD_PREVIEW__ === true)
-  || import.meta.env.VITE_OD_PREVIEW === 'true';
+const IS_OD_PREVIEW = import.meta.env.VITE_OD_PREVIEW === 'true';
 
 const statusLabels = {
   'planned': 'План',
