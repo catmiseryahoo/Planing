@@ -2803,13 +2803,7 @@ function App() {
                       <div className="project-progress-fill" style={{width: `${projectMetrics.actualProgress}%`}}></div>
                     </div>
                   </div>
-                  <div className="overview-metric progress">
-                    <div className="overview-label">Прогресс</div>
-                    <div className="overview-mini-bar">
-                      <div className="overview-mini-bar-fill" style={{width: `${projectMetrics.actualProgress}%`}}></div>
-                    </div>
-                    <div className="overview-value">{projectMetrics.actualProgress}%</div>
-                  </div>
+
                   <div className="overview-metric">
                     <div className="overview-label">Выполнено</div>
                     <div className="overview-value">{projectMetrics.actualProgress}%</div>

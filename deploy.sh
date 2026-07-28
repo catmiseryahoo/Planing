@@ -19,9 +19,15 @@ fi
 echo "=== 1. Сборка фронтенда ==="
 cd frontend
 VITE_SUPABASE_URL= npm run build
+
+echo "=== 2. Production guard — проверка безопасности ==="
+/home/catmiser/.hermes/node/bin/node scripts/verify-production-safe.mjs || {
+  echo "ОШИБКА: Production bundle содержит preview-данные. Деплой отменён."
+  exit 1
+}
 cd ..
 
-echo "=== 2. Подготовка пакета ==="
+echo "=== 3. Подготовка пакета ==="
 BUNDLE="/tmp/plan-hostland-node"
 rm -rf "$BUNDLE"
 mkdir -p "$BUNDLE"
@@ -41,7 +47,7 @@ cat > "$BUNDLE/package.json" <<'JSON'
 }
 JSON
 
-echo "=== 3. Загрузка файлов по FTP на Hostland ==="
+echo "=== 4. Загрузка файлов по FTP на Hostland ==="
 BASE="ftp://plan.goplaytennis.ru/plan.goplaytennis.ru/projects/Plan"
 
 # Создаем папки
@@ -63,7 +69,7 @@ find "$BUNDLE" -type f | while read -r file; do
     "$BASE/$rel"
 done
 
-echo "=== 4. Перезапуск Node.js приложения ==="
+echo "=== 5. Перезапуск Node.js приложения ==="
 printf 'restart %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tmp/hostland-restart.txt
 curl --fail --show-error --silent --ftp-pasv --ftp-create-dirs \
   --connect-timeout 20 --max-time 60 \

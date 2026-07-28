@@ -813,7 +813,7 @@ body::before {
 
 .project-overview {
   display: grid;
-  grid-template-columns: minmax(220px, 1.25fr) repeat(6, minmax(92px, 1fr));
+  grid-template-columns: minmax(220px, 74fr) repeat(5, minmax(65px, 5.2fr));
   gap: 0.75rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--panel-border);

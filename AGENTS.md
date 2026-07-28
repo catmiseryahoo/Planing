@@ -11,6 +11,42 @@ When changing the frontend, use the referenced plugin as a design brief rather t
 - Preserve workflow density: project list, status metrics, map/Gantt surfaces, task panels, messenger, and profile tools should stay scannable and efficient.
 - Verify frontend changes with a local build and, when a dev server is running, a browser check.
 
+## ⚠️ CRITICAL: OD-preview и production — изолированные режимы сборки
+
+**OD-preview НИКОГДА не должен попадать в production.**
+
+- Production entrypoint: `frontend/index.html` — не должен содержать `window.__OD_PREVIEW__`.
+- `IS_OD_PREVIEW` — compile-time константа (только `import.meta.env.VITE_OD_PREVIEW`). Без `window.__OD_PREVIEW__`.
+- Production build (`VITE_SUPABASE_URL= npm run build`) компилируется БЕЗ `VITE_OD_PREVIEW`. Tree-shaking удаляет все мок-данные.
+- OD-preview использует `VITE_OD_PREVIEW=true` через `define` в `od-preview.vite.config.js` и `od-native-preview.vite.config.js`.
+- Мок-данные (`design-preview@example.local`, `OD_PREVIEW_SESSION`, `OD_PREVIEW_DATA`) никогда не должны присутствовать в `frontend/dist/`.
+
+### Workflow после изменений дизайна
+
+1. **Редактировать только исходники**: `frontend/src/App.jsx`, `frontend/src/index.css`, и т.д.
+2. **Проверить OD-preview**:
+   ```
+   cd /home/catmiser/projects/Planing/frontend
+   /home/catmiser/.hermes/node/bin/node scripts/build-od-native-preview.mjs
+   /home/catmiser/.hermes/node/bin/node scripts/verify-od-native-preview.mjs
+   ```
+3. **Визуально проверить** в OD через preview `frontend/index.html`.
+4. **Перед production-сборкой** проверить `frontend/index.html` — нет preview-флага.
+5. **Production сборка**:
+   ```
+   cd /home/catmiser/projects/Planing
+   ./deploy.sh   # или VITE_SUPABASE_URL= npm run build в frontend/
+   ```
+6. **Production guard** — обязательная проверка `frontend/dist/`:
+   ```
+   /home/catmiser/.hermes/node/bin/node frontend/scripts/verify-production-safe.mjs
+   ```
+   Скрипт завершается FAIL, если в dist/ есть preview-флаг, мок-данные или `OD_PREVIEW_SESSION`.
+7. **Перед деплоем убедиться**, что все проверки PASS.
+8. **После деплоя** проверить опубликованный URL с cache-bust.
+
+**Нарушение этих правил = production с тестовым аккаунтом вместо реальной авторизации.**
+
 ## Open Design preview contract
 
 - This is an existing Vite/React application, not a single-file web prototype.
