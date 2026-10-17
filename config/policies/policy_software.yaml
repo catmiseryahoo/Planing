@@ -1,0 +1,15 @@
+agent_skill_bindings:
+  agent_builder:
+  - skill_builder
+  agent_reviewer:
+  - skill_reviewer
+  agent_security_reviewer:
+  - skill_security_reviewer
+  agent_tester:
+  - skill_tester
+external_actions_default: approval_required
+name: Software Factory policy profile
+network_default: none
+policy_profile_id: policy_software
+version: 1.0.0
+workspace_default: staging_only

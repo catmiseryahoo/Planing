@@ -1,0 +1,18 @@
+schema_version = "1.4.0"
+environment = "development"
+default_promotion_mode = "manual"
+control_db = "ops/control.sqlite"
+index_db = ".raytsystem/index.sqlite"
+
+[documents]
+index_db = ".raytsystem/documents.sqlite"
+max_files = 100000
+max_file_bytes = 5242880
+max_total_bytes = 536870912
+search_page_size = 50
+
+[[documents.roots]]
+id = "manual"
+path = "knowledge/manual"
+mode = "read_write"
+kind = "notes"

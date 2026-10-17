@@ -1,0 +1,12 @@
+accent: '#5b8def'
+agent_id: agent_security_reviewer
+capabilities: []
+description: Security Reviewer agent for the software workflow.
+enabled: false
+name: Security Reviewer
+pack_id: pack_software
+role: security_reviewer
+runtime_adapter_id: adapter_disabled
+skill_ids:
+- skill_security_reviewer
+version: 1.0.0

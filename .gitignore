@@ -1,0 +1,19 @@
+.DS_Store
+supabase/.temp/
+.vercel
+.env
+.env.local
+.agents/**/node_modules/
+graphify-out/
+
+# Security cleanup: local and automatically executable artifacts
+.github/workflows/
+.agents/
+.claude/
+.githooks/
+.raytsystem/
+.vercel/
+frontend/dist/
+frontend/od-preview-build/
+frontend/od-preview-built.html
+._*
